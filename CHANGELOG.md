@@ -2,6 +2,13 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.2] - 2026-10-18
+
+### Changed
+- Publish new application versions from Cloudflare with a repository-scoped GitHub release credential.
+- Verify release asset sizes and SHA-256 digests before publishing, and resume incomplete draft uploads on retry.
+- Preserve published release tags and assets when later builds use the same application version.
+
 ## [0.1.1] - 2026-10-18
 
 ### Added
