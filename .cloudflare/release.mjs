@@ -96,7 +96,7 @@ export async function publishRelease({ directory, commit, api, notes = '', log =
     ...manifest.files.map(f => `| \`${f.name}\` | ${f.variant.includes('arm64') ? 'ARM64' : 'Intel / AMD x64'} |`),
     '', 'Choose a setup EXE to install Jemur, or run the portable EXE directly. Every package includes the .NET runtime.',
     'The installer adds Start menu shortcuts and an installed-apps entry for your current Windows user. Uninstalling retains your library and settings.',
-    '', `Built and published automatically by Cloudflare Workers Builds from commit \`${commit}\`. Linux tests, Windows cross-compilation and public download SHA-256 checks passed before publication.`,
+    '', `Built by Cloudflare Workers Builds from commit \`${commit}\`. Linux tests, Windows cross-compilation and public download SHA-256 checks passed before publication. Assets are uploaded and verified by Jemur's release publisher.`,
     'ARM64 runtime testing still requires an ARM64 Windows device. See manifest.json and SHA256SUMS.txt for package details and hashes.',
   ].join('\n');
   if (!release) {
