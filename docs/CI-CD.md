@@ -34,7 +34,8 @@ installed from Microsoft's official installer when it is not available.
 5. Python's standard library creates ZIPs and SHA-256 checksums. ZIPs are split
    into 20 MiB static assets; the Worker streams their bytes back as one ZIP.
 6. The deploy script rejects a checkout that no longer matches `origin/main`,
-   deploys the Worker and verifies the live source commit.
+   deploys the Worker, verifies the live source commit, and downloads all four
+   public ZIPs to check their byte counts and SHA-256 checksums.
 
 Run the complete suite on Windows before publishing:
 

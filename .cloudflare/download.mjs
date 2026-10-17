@@ -41,21 +41,35 @@ export function createWorker(manifest) {
       }
       if (head) return new Response(null, { headers });
       const responses = await Promise.all(file.chunks.map(c => env.ASSETS.fetch(new URL(c.path, url.origin))));
-      if (responses.some((r, i) => !r.ok || !r.body || Number(r.headers.get('Content-Length')) !== file.chunks[i].size)) {
+      if (responses.some((r, i) => !r.ok || !r.body ||
+        (r.headers.has('Content-Length') && Number(r.headers.get('Content-Length')) !== file.chunks[i].size))) {
         await Promise.all(responses.map(r => r.body?.cancel()));
         return new Response('Download temporarily unavailable', { status: 503 });
       }
       const readers = responses.map(r => r.body.getReader());
       let index = 0;
+      let chunkBytes = 0;
       const stream = new ReadableStream({
         async pull(controller) {
-          while (index < readers.length) {
-            const { done, value } = await readers[index].read();
-            if (done) { index++; continue; }
-            controller.enqueue(value);
-            return;
+          try {
+            while (index < readers.length) {
+              const { done, value } = await readers[index].read();
+              if (done) {
+                if (chunkBytes !== file.chunks[index].size) throw new Error('Incomplete download chunk');
+                index++;
+                chunkBytes = 0;
+                continue;
+              }
+              chunkBytes += value.byteLength;
+              if (chunkBytes > file.chunks[index].size) throw new Error('Oversized download chunk');
+              controller.enqueue(value);
+              return;
+            }
+            controller.close();
+          } catch (error) {
+            await Promise.allSettled(readers.map(r => r.cancel(error)));
+            controller.error(error);
           }
-          controller.close();
         },
         async cancel(reason) { await Promise.all(readers.map(r => r.cancel(reason))); },
       });

@@ -23,6 +23,25 @@ test('streams every chunk in order as one download with its checksum', async () 
   assert.deepEqual(downloaded, bytes);
   assert.equal(response.headers.get('ETag'), `"${createHash('sha256').update(downloaded).digest('hex')}"`);
 });
+
+test('streams assets without Content-Length, as returned by the ASSETS binding', async () => {
+  const withoutLength = { ASSETS: { fetch: async url => {
+    const index = file.chunks.findIndex(c => c.path === new URL(url).pathname);
+    return new Response(chunks[index]);
+  } } };
+  const response = await worker.fetch(request(`/downloads/${file.name}`), withoutLength);
+  assert.equal(response.status, 200);
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+});
+
+test('rejects truncated or oversized streamed chunks even without Content-Length', async () => {
+  for (const body of ['short', 'a'.repeat(100)]) {
+    const response = await worker.fetch(request(`/downloads/${file.name}`), {
+      ASSETS: { fetch: async () => new Response(body) },
+    });
+    await assert.rejects(response.arrayBuffer(), /download chunk/);
+  }
+});
 test('HEAD and conditional requests do not read assets', async () => {
   const unavailable = { ASSETS: { fetch() { throw new Error('must not fetch'); } } };
   const head = await worker.fetch(request(`/downloads/${file.name}`, { method: 'HEAD' }), unavailable);

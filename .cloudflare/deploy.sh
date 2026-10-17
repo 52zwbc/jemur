@@ -17,3 +17,4 @@ curl --retry 5 --retry-delay 3 --retry-all-errors --fail --silent --show-error \
     if (health.commit !== process.argv[1]) throw new Error("Deployed commit does not match build");
     console.log("Verified deployed commit: " + health.commit);
   ' "$commit"
+node .cloudflare/verify-live.mjs "$commit"
