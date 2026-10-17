@@ -9,7 +9,7 @@ if [[ "$commit" != "$remote_commit" ]]; then
 fi
 npx wrangler deploy
 curl --retry 5 --retry-delay 3 --retry-all-errors --fail --silent --show-error \
-  "https://jemur-downloads.moc-18e.workers.dev/health?commit=$commit" \
+  "https://jemur-downloads.syeana-co.workers.dev/health?commit=$commit" \
   | node --input-type=module -e '
     let input = "";
     for await (const chunk of process.stdin) input += chunk;

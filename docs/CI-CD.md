@@ -1,7 +1,7 @@
 # CI/CD
 
 Jemur builds and publishes downloads using Cloudflare Workers Builds in the
-**MOC** account (`18e1caedb6e3a167e1702932a4ecf232`). GitHub hosts the source;
+**Syeana** account (`c595078d172b45beb8df900b7cbb24cb`). GitHub hosts the source;
 GitHub Actions is not used. Pushing a version tag alone does not publish a build.
 
 ## Cloudflare settings
@@ -49,13 +49,13 @@ parsing and WPF runtime behavior still require Windows validation.
 
 ## Downloads and verification
 
-- [x64](https://jemur-downloads.moc-18e.workers.dev/latest/win-x64)
-- [x64 standalone](https://jemur-downloads.moc-18e.workers.dev/latest/win-x64-standalone)
-- [ARM64](https://jemur-downloads.moc-18e.workers.dev/latest/win-arm64)
-- [ARM64 standalone](https://jemur-downloads.moc-18e.workers.dev/latest/win-arm64-standalone)
-- [Checksums](https://jemur-downloads.moc-18e.workers.dev/SHA256SUMS.txt)
-- [Manifest](https://jemur-downloads.moc-18e.workers.dev/manifest.json)
-- [Deployed commit](https://jemur-downloads.moc-18e.workers.dev/health)
+- [x64](https://jemur-downloads.syeana-co.workers.dev/latest/win-x64)
+- [x64 standalone](https://jemur-downloads.syeana-co.workers.dev/latest/win-x64-standalone)
+- [ARM64](https://jemur-downloads.syeana-co.workers.dev/latest/win-arm64)
+- [ARM64 standalone](https://jemur-downloads.syeana-co.workers.dev/latest/win-arm64-standalone)
+- [Checksums](https://jemur-downloads.syeana-co.workers.dev/SHA256SUMS.txt)
+- [Manifest](https://jemur-downloads.syeana-co.workers.dev/manifest.json)
+- [Deployed commit](https://jemur-downloads.syeana-co.workers.dev/health)
 
 `/latest/<variant>` redirects to the current package. The public manifest records
 its version, full source commit, filename, size and SHA-256. Match the live commit

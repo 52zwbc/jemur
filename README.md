@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://jemur-downloads.moc-18e.workers.dev/latest/win-x64"><b>Download</b></a> ·
+  <a href="https://jemur-downloads.syeana-co.workers.dev/latest/win-x64"><b>Download</b></a> ·
   <a href="#features">Features</a> ·
   <a href="#screenshots">Screenshots</a> ·
   <a href="#shortcuts">Shortcuts</a> ·
@@ -81,13 +81,13 @@ Then a simple idea came to me: what if they just hung along the top of the scree
 
 ## Install
 
-1. Download the latest successful build for [Windows x64](https://jemur-downloads.moc-18e.workers.dev/latest/win-x64) or [Windows ARM64](https://jemur-downloads.moc-18e.workers.dev/latest/win-arm64).
+1. Download the latest successful build for [Windows x64](https://jemur-downloads.syeana-co.workers.dev/latest/win-x64) or [Windows ARM64](https://jemur-downloads.syeana-co.workers.dev/latest/win-arm64).
 2. Unzip it anywhere and run `Jemur.exe`. It lives in the notification area.
 3. Optional: turn on **Settings → Start with Windows**.
 
-The regular zip needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) — Windows offers to install it the first time. Standalone downloads include the runtime: [x64](https://jemur-downloads.moc-18e.workers.dev/latest/win-x64-standalone) or [ARM64](https://jemur-downloads.moc-18e.workers.dev/latest/win-arm64-standalone).
+The regular zip needs the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) — Windows offers to install it the first time. Standalone downloads include the runtime: [x64](https://jemur-downloads.syeana-co.workers.dev/latest/win-x64-standalone) or [ARM64](https://jemur-downloads.syeana-co.workers.dev/latest/win-arm64-standalone).
 
-[Checksums](https://jemur-downloads.moc-18e.workers.dev/SHA256SUMS.txt) and the [build manifest](https://jemur-downloads.moc-18e.workers.dev/manifest.json) identify the source commit and packages. These links track the latest successful `main` build; previous releases are not archived here.
+[Checksums](https://jemur-downloads.syeana-co.workers.dev/SHA256SUMS.txt) and the [build manifest](https://jemur-downloads.syeana-co.workers.dev/manifest.json) identify the source commit and packages. These links track the latest successful `main` build; previous releases are not archived here.
 
 Runs on Windows 10 (1809 or later) and Windows 11. Mica and rounded corners appear on Windows 11.
 

@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "jemur-downloads",
   "main": ".cloudflare/worker.mjs",
-  "account_id": "18e1caedb6e3a167e1702932a4ecf232",
+  "account_id": "c595078d172b45beb8df900b7cbb24cb",
   "compatibility_date": "2026-10-17",
   "workers_dev": true,
   "assets": {

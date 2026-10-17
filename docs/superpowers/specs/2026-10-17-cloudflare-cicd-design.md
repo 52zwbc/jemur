@@ -1,6 +1,6 @@
 # Cloudflare CI/CD
 
-Approved in chat: use the MOC Cloudflare account, build/release on Cloudflare,
+Approved in chat: use the Syeana Cloudflare account, build/release on Cloudflare,
 and run Linux-compatible tests there. WPF tests remain a Windows check.
 
 Pushes to `main` build Windows x64 and ARM64 packages, in framework-dependent and
@@ -15,7 +15,7 @@ version, sizes and SHA-256 checksums. Only the current successful build is linke
 this is not a historical release archive. GitHub remains the source host; GitHub
 Actions is disabled and is not used to build or deploy.
 
-The target account is MOC (`18e1caedb6e3a167e1702932a4ecf232`), selected by the
+The target account is Syeana (`c595078d172b45beb8df900b7cbb24cb`), selected by the
 user. Payment and changes to billing are outside this task.
 
 Validation: run the original Windows suite, portable tests, download Worker tests,

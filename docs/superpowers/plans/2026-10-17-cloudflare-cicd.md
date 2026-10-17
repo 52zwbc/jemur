@@ -12,7 +12,7 @@ Cloudflare builds packages and atomically deploys a Worker with static ZIP chunk
 
 ## Global Constraints
 
-- MOC Cloudflare account `18e1caedb6e3a167e1702932a4ecf232`.
+- Syeana Cloudflare account `c595078d172b45beb8df900b7cbb24cb`.
 - Windows x64 and ARM64, framework-dependent and standalone ZIPs.
 - Do not claim WPF tests ran on Linux; no additional Windows runner.
 - No R2 activation, billing changes, GitHub Actions, or embedded credentials.
