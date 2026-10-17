@@ -3,6 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 commit="$(git rev-parse HEAD)"
+printf 'Checkout commit: %s; Cloudflare commit: %s\n' "$commit" "${WORKERS_CI_COMMIT_SHA:-unset}"
 if [[ -n "${WORKERS_CI_COMMIT_SHA:-}" && "$commit" != "$WORKERS_CI_COMMIT_SHA" ]]; then
   echo 'Checkout does not match the Cloudflare build commit.' >&2
   exit 1
