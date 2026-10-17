@@ -5,6 +5,7 @@ using Xunit;
 namespace Jemur.Tests;
 
 /// <summary>Library behaviour against a throwaway data folder.</summary>
+[Collection("AppPaths")]
 public sealed class LibraryTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "jemur-tests-" + Guid.NewGuid().ToString("N"));

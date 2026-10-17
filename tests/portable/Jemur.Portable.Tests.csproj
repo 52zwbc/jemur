@@ -10,10 +10,13 @@
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
     <Compile Include="../LibraryTests.cs" Link="LibraryTests.cs" />
+    <Compile Include="../AppPathsCollection.cs" Link="AppPathsCollection.cs" />
+    <Compile Include="../SettingsStoreTests.cs" Link="SettingsStoreTests.cs" />
     <Compile Include="../LocalizationTests.cs" Link="LocalizationTests.cs" />
     <Compile Include="../../src/Core/AppPaths.cs" Link="Core/AppPaths.cs" />
     <Compile Include="../../src/Core/Library.cs" Link="Core/Library.cs" />
     <Compile Include="../../src/Core/Log.cs" Link="Core/Log.cs" />
     <Compile Include="../../src/Core/Models.cs" Link="Core/Models.cs" />
+    <Compile Include="../../src/Core/SettingsStore.cs" Link="Core/SettingsStore.cs" />
   </ItemGroup>
 </Project>
