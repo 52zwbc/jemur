@@ -22,7 +22,7 @@ public sealed class LibraryTests : IDisposable
 
     private static string FakeShot()
     {
-        var p = Images.NewShotPath();
+        var p = Path.Combine(AppPaths.Shots, Guid.NewGuid().ToString("N") + ".png");
         File.WriteAllBytes(p, new byte[] { 1, 2, 3 });
         return p;
     }

@@ -19,3 +19,9 @@ Thumbs.db
 
 # Test results
 TestResults/
+
+# Cloudflare build tools and local state
+.dotnet/
+.wrangler/
+node_modules/
+__pycache__/

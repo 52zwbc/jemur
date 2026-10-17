@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <Compile Include="../LibraryTests.cs" Link="LibraryTests.cs" />
+    <Compile Include="../LocalizationTests.cs" Link="LocalizationTests.cs" />
+    <Compile Include="../../src/Core/AppPaths.cs" Link="Core/AppPaths.cs" />
+    <Compile Include="../../src/Core/Library.cs" Link="Core/Library.cs" />
+    <Compile Include="../../src/Core/Log.cs" Link="Core/Log.cs" />
+    <Compile Include="../../src/Core/Models.cs" Link="Core/Models.cs" />
+  </ItemGroup>
+</Project>

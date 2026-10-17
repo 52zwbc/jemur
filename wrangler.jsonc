@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jemur-downloads",
+  "main": ".cloudflare/worker.mjs",
+  "account_id": "18e1caedb6e3a167e1702932a4ecf232",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./artifacts/site",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  }
+}

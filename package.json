@@ -1,0 +1,11 @@
+{
+  "name": "jemur-ci",
+  "private": true,
+  "scripts": {
+    "test:downloads": "node --test .cloudflare/download.test.mjs",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.151.1"
+  }
+}

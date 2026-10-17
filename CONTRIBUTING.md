@@ -60,11 +60,11 @@ $env:JEMUR_DATA = "C:\path\to\demo-data"   # a folder with items.json + shots\
 
 ## Releasing (maintainers)
 
-Bump `<Version>` in `src/Jemur.csproj`, update `CHANGELOG.md`, then push a tag:
+Bump `<Version>` in `src/Jemur.csproj`, update `CHANGELOG.md`, and run the full Windows suite before pushing to `main`:
 
 ```powershell
-git tag v0.2.0
-git push origin v0.2.0
+dotnet test Jemur.sln -c Release
+git push origin main
 ```
 
-The release workflow builds x64 and ARM64 zips (framework-dependent and standalone) and opens a draft release.
+Cloudflare Workers Builds runs portable tests, compiles the Windows solution, builds x64 and ARM64 zips (framework-dependent and standalone), and updates the download service. WPF tests run on Windows and are not executed by the Linux build environment. See [CI/CD](docs/CI-CD.md) for setup, commands and verification.

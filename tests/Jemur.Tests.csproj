@@ -11,6 +11,7 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Remove="portable/**" />
     <ProjectReference Include="..\src\Jemur.csproj" />
   </ItemGroup>
 </Project>
