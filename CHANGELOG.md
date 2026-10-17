@@ -2,6 +2,15 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.4] - 2026-10-18
+
+### Added
+- Manual update checks in About and a quiet delayed/24-hour background check.
+- Tray notification when a newer verified GitHub release is available.
+
+### Changed
+- Update metadata is validated before it can be shown, and downloads remain an explicit user action.
+
 ## [0.1.3] - 2026-10-18
 
 ### Added

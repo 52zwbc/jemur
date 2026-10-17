@@ -103,6 +103,20 @@ SHA256`. Old `-standalone` links redirect to the corresponding portable EXE.
 Cloudflare tracks the latest successful `main` build. Failed builds leave the
 previous deployment active.
 
+## In-app update checks
+
+Jemur reads the public `manifest.json` endpoint below for its manual About check
+and its quiet in-process background check:
+
+`https://jemur-downloads.syeana-co.workers.dev/manifest.json`
+
+The client validates the semantic version, source commit and GitHub release URL
+before showing an update. It checks once about 30 seconds after startup and no
+more than once every 24 hours while Jemur is running. A newer version produces
+one tray notification per process. The application does not download, execute,
+replace or restart itself; the user chooses the GitHub release page and starts
+the installer.
+
 ## Automatic GitHub Releases
 
 Bump `<Version>` in `src/Jemur.csproj`, add the corresponding changelog entry,

@@ -103,6 +103,18 @@ versioned downloads. The Cloudflare links above track the latest successful
 and the [build manifest](https://jemur-downloads.syeana-co.workers.dev/manifest.json)
 identify its source commit and packages.
 
+## Updates
+
+Open **About** and choose **Check for updates** to check the public release
+manifest. Jemur also performs a quiet check about 30 seconds after startup and
+at most once every 24 hours while it is running. When a newer version exists,
+Jemur shows a notification in the Windows notification area.
+
+The checker sends no account or library data. It only reads the public
+manifest. Jemur never downloads or installs an update by itself. Choose
+**Download installer** in About to open the verified GitHub release page and
+start the installer yourself.
+
 Runs on Windows 10 (1809 or later) and Windows 11. Mica and rounded corners appear on Windows 11.
 
 ## Shortcuts
