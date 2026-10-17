@@ -18,6 +18,7 @@ namespace Jemur.App;
 internal sealed class JemurApp
 {
     public const string RepoUrl = "https://github.com/revanapriyandi/jemur";
+    public const string ManifestUrl = "https://jemur-downloads.syeana-co.workers.dev/manifest.json";
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     private static readonly double[] CardScales = { 0.85, 1.0, 1.22 };
 
@@ -28,6 +29,8 @@ internal sealed class JemurApp
     private readonly bool _background;
     private HotkeyManager _hotkeys = null!;
     private TrayIcon _tray = null!;
+    private HttpClient? _updateHttp;
+    private UpdateCoordinator? _updates;
     private ControlPanel? _panel;
     private SpotlightWindow? _spotlight;
     private MarkupWindow? _markup;
@@ -37,6 +40,7 @@ internal sealed class JemurApp
     public Library Library { get; } = new();
     public LineWindow Line { get; private set; } = null!;
     public bool HasOverlay => _spotlight != null || _markup != null || _capturing;
+    internal IUpdateChecker UpdateChecker { get; private set; } = null!;
 
     public JemurApp(Application wpf, bool background, string? renderDocs = null)
     {
@@ -112,6 +116,10 @@ internal sealed class JemurApp
         _tray.Click += () => ShowPanel();
         _tray.RightClick += ShowTrayMenu;
         _tray.Show(Theme.IsTaskbarLight(), TrayTip());
+        _updateHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
+        UpdateChecker = new UpdateChecker(_updateHttp, Version, new Uri(ManifestUrl), RepoUrl);
+        _updates = new UpdateCoordinator(UpdateChecker, _tray.Notify, () => ShowPanel(), TimeProvider.System, TimeSpan.FromSeconds(30), TimeSpan.FromHours(24));
+        _updates.Start();
         Theme.Changed += () => _tray.SetIcon(Theme.IsTaskbarLight());
         L.Changed += () => _tray.SetTip(TrayTip());
 
@@ -136,6 +144,8 @@ internal sealed class JemurApp
     public void Stop()
     {
         if (_renderDocs == null) Library.SaveNow();
+        _updates?.Dispose();
+        _updateHttp?.Dispose();
         _hotkeys?.Dispose();
         _tray?.Dispose();
         Log.Info("Jemur stopped");
@@ -217,6 +227,9 @@ internal sealed class JemurApp
     // ───────────── settings ─────────────
 
     public void SetTheme(string mode) { Settings.Theme = mode; SettingsStore.Save(Settings); Theme.SetMode(mode); }
+
+    internal Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken cancellationToken) =>
+        _updates?.CheckNowAsync(cancellationToken) ?? UpdateChecker.CheckAsync(cancellationToken);
 
     public void SetLanguage(string code) { Settings.Language = code; SettingsStore.Save(Settings); L.Use(code); Line.Rebuild(); }
 
