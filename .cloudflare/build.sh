@@ -18,7 +18,7 @@ fi
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 export DOTNET_NOLOGO=1
 
-node --test .cloudflare/download.test.mjs
+node --test .cloudflare/*.test.mjs
 dotnet test tests/portable/Jemur.Portable.Tests.csproj -c Release --logger 'trx;LogFileName=portable.trx'
 dotnet build Jemur.sln -c Release -p:EnableWindowsTargeting=true
 echo 'WPF tests are compiled above; running them requires Windows.'

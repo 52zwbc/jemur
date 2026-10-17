@@ -23,7 +23,8 @@ installed from Microsoft's official installer when it is not available.
 
 1. Node tests exercise streamed EXE downloads, checksum headers, missing chunks,
    HEAD/conditional requests, old standalone links and public routes. Chunks are
-   fetched one at a time to keep asset connections bounded.
+   fetched one at a time and piped through Cloudflare's native FixedLengthStream
+   to keep asset connections bounded and enforce the response Content-Length.
 2. `dotnet test tests/portable/Jemur.Portable.Tests.csproj -c Release` runs the
    existing library and localization tests against the actual linked production
    sources. No WPF types are replaced with stubs.
@@ -43,7 +44,9 @@ installed from Microsoft's official installer when it is not available.
    The manifest records architecture, package type, source commit and SHA-256.
 7. The deploy script rejects a checkout that no longer matches `origin/main`,
    deploys the Worker, verifies the live source commit, and downloads all four
-   public EXEs to check byte counts, SHA-256 and Windows executable magic.
+   public EXEs to check byte counts, SHA-256 and Windows executable magic. It
+   retries health and manifest checks while the new deployment propagates,
+   requiring both endpoints to report the expected commit before downloading.
 
 Run the complete suite on Windows before publishing:
 

@@ -2,7 +2,7 @@
   "name": "jemur-ci",
   "private": true,
   "scripts": {
-    "test:downloads": "node --test .cloudflare/download.test.mjs",
+    "test:downloads": "node --test .cloudflare/*.test.mjs",
     "deploy": "wrangler deploy"
   },
   "devDependencies": {

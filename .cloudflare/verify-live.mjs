@@ -1,11 +1,10 @@
 import { createHash } from 'node:crypto';
+import { waitForDeployment } from './live-manifest.mjs';
 
 const origin = 'https://jemur-downloads.syeana-co.workers.dev';
 const expectedCommit = process.argv[2];
-const response = await fetch(`${origin}/manifest.json?commit=${expectedCommit}`);
-if (!response.ok) throw new Error(`Manifest returned HTTP ${response.status}`);
-const manifest = await response.json();
-if (manifest.commit !== expectedCommit) throw new Error('Download manifest does not match build');
+const manifest = await waitForDeployment(origin, expectedCommit);
+console.log('Verified deployed commit: ' + manifest.commit);
 const variants = ['win-arm64', 'win-arm64-setup', 'win-x64', 'win-x64-setup'];
 if (JSON.stringify(manifest.files.map(file => file.variant).sort()) !== JSON.stringify(variants)) {
   throw new Error('Expected portable and installer EXEs for both architectures');

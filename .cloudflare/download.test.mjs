@@ -8,7 +8,20 @@ const bytes = Buffer.concat(chunks);
 const file = { name: 'Jemur-0.1.1-win-x64.exe', variant: 'win-x64', kind: 'portable', size: bytes.length,
   sha256: createHash('sha256').update(bytes).digest('hex'),
   chunks: chunks.map((c, i) => ({ path: `/_chunks/test.${i}`, size: c.length })) };
-const worker = createWorker({ version: '0.1.0', commit: 'a'.repeat(40), files: [file] });
+const fixedLengthStream = expected => {
+  let written = 0;
+  return new TransformStream({
+    transform(chunk, controller) {
+      written += chunk.byteLength;
+      if (written > expected) throw new Error('Oversized download chunk');
+      controller.enqueue(chunk);
+    },
+    flush() {
+      if (written !== expected) throw new Error('Incomplete download chunk');
+    },
+  });
+};
+const worker = createWorker({ version: '0.1.1', commit: 'a'.repeat(40), files: [file] }, fixedLengthStream);
 const request = (path, options) => new Request(`https://jemur.example${path}`, options);
 const env = { ASSETS: { fetch: async url => {
   const index = file.chunks.findIndex(c => c.path === new URL(url).pathname);
@@ -35,6 +48,17 @@ test('opens asset chunks on demand instead of holding every connection open', as
   assert.equal(fetched.length, 1);
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
   assert.deepEqual(fetched, file.chunks.map(c => c.path));
+});
+
+test('uses a fixed-length output stream so Cloudflare can enforce Content-Length', async () => {
+  const lengths = [];
+  const fixedOutput = createWorker({ version: '0.1.1', commit: 'a'.repeat(40), files: [file] }, size => {
+    lengths.push(size);
+    return new TransformStream();
+  });
+  const response = await fixedOutput.fetch(request(`/downloads/${file.name}`), env);
+  assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes);
+  assert.deepEqual(lengths, [bytes.length]);
 });
 
 test('a missing later chunk interrupts the download instead of returning a truncated EXE', async () => {

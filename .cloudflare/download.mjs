@@ -1,6 +1,6 @@
-export function createWorker(manifest) {
+export function createWorker(manifest, createStream = size => new FixedLengthStream(size)) {
   return {
-    async fetch(request, env) {
+    async fetch(request, env, context) {
       if (!['GET', 'HEAD'].includes(request.method)) {
         return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
       }
@@ -49,42 +49,27 @@ export function createWorker(manifest) {
           await response.body?.cancel();
           throw new Error('Unavailable download chunk');
         }
-        return response.body.getReader();
+        return response.body;
       }
-      let reader;
-      try { reader = await openChunk(0); } catch {
+      let firstChunk;
+      try { firstChunk = await openChunk(0); } catch {
         return new Response('Download temporarily unavailable', { status: 503 });
       }
-      let index = 0;
-      let chunkBytes = 0;
-      const stream = new ReadableStream({
-        async pull(controller) {
-          try {
-            while (index < file.chunks.length) {
-              reader ??= await openChunk(index);
-              const { done, value } = await reader.read();
-              if (done) {
-                if (chunkBytes !== file.chunks[index].size) throw new Error('Incomplete download chunk');
-                reader.releaseLock();
-                reader = null;
-                index++;
-                chunkBytes = 0;
-                continue;
-              }
-              chunkBytes += value.byteLength;
-              if (chunkBytes > file.chunks[index].size) throw new Error('Oversized download chunk');
-              controller.enqueue(value);
-              return;
-            }
-            controller.close();
-          } catch (error) {
-            await reader?.cancel(error).catch(() => {});
-            controller.error(error);
+      const { readable, writable } = createStream(file.size);
+      const transfer = (async () => {
+        try {
+          for (let index = 0; index < file.chunks.length; index++) {
+            const body = index === 0 ? firstChunk : await openChunk(index);
+            await body.pipeTo(writable, { preventClose: true });
           }
-        },
-        async cancel(reason) { await reader?.cancel(reason); },
-      });
-      return new Response(stream, { headers });
+          const writer = writable.getWriter();
+          try { await writer.close(); } finally { writer.releaseLock(); }
+        } catch (error) {
+          await writable.abort(error).catch(() => {});
+        }
+      })();
+      context?.waitUntil(transfer);
+      return new Response(readable, { headers });
     },
   };
 }
