@@ -25,6 +25,10 @@ internal sealed class ControlPanel : Window
     private Page _page = Page.Line;
     private string _filter = "all";
     private string _query = "";
+    private UpdateCheckResult? _updateResult;
+    private DateTime? _lastUpdateCheck;
+    private bool _updateChecking;
+    private CancellationTokenSource? _updateRequest;
     private System.Windows.Threading.DispatcherTimer? _searchDelay;
 
     public ControlPanel(JemurApp app)
@@ -50,6 +54,7 @@ internal sealed class ControlPanel : Window
         L.Changed += OnLanguageChanged;
         Closed += (_, _) =>
         {
+            _updateRequest?.Cancel();
             _app.Library.Changed -= OnLibraryChanged;
             L.Changed -= OnLanguageChanged;
             Memory.TrimSoon();
@@ -509,6 +514,26 @@ internal sealed class ControlPanel : Window
         head.Children.Add(text);
         list.Children.Add(Ui.Card(head, new Thickness(20)));
 
+        var updateActions = new StackPanel { Orientation = Orientation.Horizontal };
+        var check = Ui.Button(_updateChecking ? L.T("about.checkingUpdates") : L.T("about.checkUpdates"), () => _ = CheckForUpdates(), Ui.Kind.Subtle);
+        check.IsEnabled = !_updateChecking;
+        updateActions.Children.Add(check);
+        if (_updateResult?.Kind == UpdateCheckKind.UpdateAvailable && _updateResult.Manifest is { } update)
+        {
+            var download = Ui.Button(L.T("about.downloadInstaller"), () => Open(update.ReleaseUrl.ToString()), Ui.Kind.Accent);
+            download.Margin = new Thickness(8, 0, 0, 0);
+            updateActions.Children.Add(download);
+        }
+        var updateStatus = _updateResult?.Kind switch
+        {
+            UpdateCheckKind.UpToDate => L.F("about.upToDate", JemurApp.Version),
+            UpdateCheckKind.UpdateAvailable when _updateResult.Manifest is { } available => L.F("about.updateAvailable", available.Version),
+            UpdateCheckKind.Failed => L.F("about.updateFailed", _updateResult.Error ?? ""),
+            _ => L.T("about.updatesDesc"),
+        };
+        if (_lastUpdateCheck is { } checkedAt) updateStatus += " " + L.F("about.lastChecked", checkedAt.ToString("g", L.Culture));
+        list.Children.Add(Ui.SettingsCard("", L.T("about.updates"), updateStatus, updateActions));
+
         var tagline = Ui.Wrap(L.T("about.tagline"), Ui.Type.Body, "J.Text");
         tagline.Margin = new Thickness(2, 16, 0, 4);
         list.Children.Add(tagline);
@@ -522,6 +547,27 @@ internal sealed class ControlPanel : Window
         list.Children.Add(Ui.Card(Ui.Wrap(L.T("about.creditsText"), Ui.Type.Body)));
         list.Children.Add(Ui.Card(Ui.Wrap(L.T("about.license"), Ui.Type.Body)));
         return Shell(L.T("nav.about"), null, list);
+    }
+
+    private async Task CheckForUpdates()
+    {
+        if (_updateChecking) return;
+        _updateChecking = true;
+        _updateRequest?.Cancel();
+        _updateRequest = new CancellationTokenSource();
+        Navigate(Page.About, animate: false);
+        try
+        {
+            var result = await _app.CheckForUpdatesAsync(_updateRequest.Token);
+            if (!IsVisible) return;
+            _updateResult = result;
+            _lastUpdateCheck = DateTime.Now;
+        }
+        finally
+        {
+            _updateChecking = false;
+            if (IsVisible) Navigate(Page.About, animate: false);
+        }
     }
 
     private static void Open(string target)

@@ -68,6 +68,22 @@ public sealed class AccessibilityTests
         Assert.Equal("Search notes", new TextBoxAutomationPeer(box).GetName());
     });
 
+    [Fact]
+    public void UpdateActionsExposeNamesAndFocus() => OnSta(() =>
+    {
+        var actions = new StackPanel { Orientation = Orientation.Horizontal };
+        var check = Ui.Button("Check for updates", () => { }, Ui.Kind.Subtle);
+        var download = Ui.Button("Download installer", () => { }, Ui.Kind.Accent);
+        actions.Children.Add(check);
+        actions.Children.Add(download);
+        Ui.SettingsCard("", "Updates", "Check for a newer release.", actions);
+
+        Assert.Equal("Check for updates", new ButtonAutomationPeer(check).GetName());
+        Assert.Equal("Download installer", new ButtonAutomationPeer(download).GetName());
+        Assert.True(check.Focusable);
+        Assert.True(download.Focusable);
+    });
+
     [Theory]
     [InlineData(Key.Tab, false)]
     [InlineData(Key.Escape, true)]
