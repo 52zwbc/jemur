@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.1] - 2026-10-18
+
+### Added
+- Per-user EXE installers for x64 and ARM64, with Start menu shortcuts and a Windows uninstall entry.
+- An optional desktop shortcut. Uninstalling preserves the library and settings.
+
+### Changed
+- Application downloads are self-contained portable EXEs and setup EXEs instead of ZIPs.
+- Cloudflare builds both installer architectures on Linux and verifies all four public executable downloads.
+- Download chunks are fetched on demand to keep streaming connections bounded.
+
 ## [0.1.0] — 2026-10-17
 
 First public release.

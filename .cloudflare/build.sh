@@ -24,11 +24,11 @@ dotnet build Jemur.sln -c Release -p:EnableWindowsTargeting=true
 echo 'WPF tests are compiled above; running them requires Windows.'
 
 for rid in win-x64 win-arm64; do
-  dotnet publish src/Jemur.csproj -c Release -r "$rid" --self-contained false \
-    -p:EnableWindowsTargeting=true -p:PublishSingleFile=true -p:PublishReadyToRun=false -o "artifacts/publish/$rid"
   dotnet publish src/Jemur.csproj -c Release -r "$rid" --self-contained true \
     -p:EnableWindowsTargeting=true -p:PublishSingleFile=true -p:PublishReadyToRun=false \
-    -p:IncludeNativeLibrariesForSelfExtract=true -o "artifacts/publish/$rid-standalone"
+    -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true \
+    -o "artifacts/publish/$rid"
 done
 
+source .cloudflare/nsis.sh
 python3 .cloudflare/package.py "$commit"

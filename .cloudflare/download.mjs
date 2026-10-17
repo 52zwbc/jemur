@@ -20,7 +20,8 @@ export function createWorker(manifest) {
         });
       }
       if (url.pathname.startsWith('/latest/')) {
-        const file = manifest.files.find(f => `/latest/${f.variant}` === url.pathname);
+        const variant = url.pathname.slice('/latest/'.length).replace(/-standalone$/, '');
+        const file = manifest.files.find(f => f.variant === variant);
         if (file) return new Response(null, { status: 302, headers: {
           Location: `/downloads/${file.name}`, 'Cache-Control': 'no-cache',
         } });
@@ -28,7 +29,7 @@ export function createWorker(manifest) {
       const file = manifest.files.find(f => `/downloads/${f.name}` === url.pathname);
       if (!file) return new Response('Not found', { status: 404 });
       const headers = new Headers({
-        'Content-Type': 'application/zip',
+        'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="${file.name}"`,
         'Content-Length': String(file.size),
         'Cache-Control': 'public, max-age=300',
@@ -40,22 +41,32 @@ export function createWorker(manifest) {
         return new Response(null, { status: 304, headers });
       }
       if (head) return new Response(null, { headers });
-      const responses = await Promise.all(file.chunks.map(c => env.ASSETS.fetch(new URL(c.path, url.origin))));
-      if (responses.some((r, i) => !r.ok || !r.body ||
-        (r.headers.has('Content-Length') && Number(r.headers.get('Content-Length')) !== file.chunks[i].size))) {
-        await Promise.all(responses.map(r => r.body?.cancel()));
+      async function openChunk(index) {
+        const chunk = file.chunks[index];
+        const response = await env.ASSETS.fetch(new URL(chunk.path, url.origin));
+        if (!response.ok || !response.body ||
+          (response.headers.has('Content-Length') && Number(response.headers.get('Content-Length')) !== chunk.size)) {
+          await response.body?.cancel();
+          throw new Error('Unavailable download chunk');
+        }
+        return response.body.getReader();
+      }
+      let reader;
+      try { reader = await openChunk(0); } catch {
         return new Response('Download temporarily unavailable', { status: 503 });
       }
-      const readers = responses.map(r => r.body.getReader());
       let index = 0;
       let chunkBytes = 0;
       const stream = new ReadableStream({
         async pull(controller) {
           try {
-            while (index < readers.length) {
-              const { done, value } = await readers[index].read();
+            while (index < file.chunks.length) {
+              reader ??= await openChunk(index);
+              const { done, value } = await reader.read();
               if (done) {
                 if (chunkBytes !== file.chunks[index].size) throw new Error('Incomplete download chunk');
+                reader.releaseLock();
+                reader = null;
                 index++;
                 chunkBytes = 0;
                 continue;
@@ -67,11 +78,11 @@ export function createWorker(manifest) {
             }
             controller.close();
           } catch (error) {
-            await Promise.allSettled(readers.map(r => r.cancel(error)));
+            await reader?.cancel(error).catch(() => {});
             controller.error(error);
           }
         },
-        async cancel(reason) { await Promise.all(readers.map(r => r.cancel(reason))); },
+        async cancel(reason) { await reader?.cancel(reason); },
       });
       return new Response(stream, { headers });
     },

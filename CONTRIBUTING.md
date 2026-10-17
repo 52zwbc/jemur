@@ -67,4 +67,9 @@ dotnet test Jemur.sln -c Release
 git push origin main
 ```
 
-Cloudflare Workers Builds runs portable tests, compiles the Windows solution, builds x64 and ARM64 zips (framework-dependent and standalone), and updates the download service. WPF tests run on Windows and are not executed by the Linux build environment. See [CI/CD](docs/CI-CD.md) for setup, commands and verification.
+Cloudflare Workers Builds runs portable tests, compiles the Windows solution,
+builds self-contained portable EXEs and NSIS setup EXEs for x64 and ARM64, and
+updates the download service. WPF tests and installer smoke checks run on Windows.
+See [CI/CD](docs/CI-CD.md) for setup, commands and verification. GitHub Releases
+are published separately using the verified Cloudflare artifacts and their exact
+manifest commit; creating a tag alone does not trigger a release.
