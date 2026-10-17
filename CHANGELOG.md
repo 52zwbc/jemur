@@ -2,6 +2,19 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-10-18
+
+### Added
+- Spanish, Brazilian Portuguese, Japanese and Malay translations.
+- Settings persistence tests for defaults, corrupt and locked files, older settings, normalization and save/load round trips. These also run in Cloudflare's Linux test suite.
+- WPF accessibility regression tests for action names, setting labels, search and shortcut recording.
+
+### Fixed
+- Expose localized control names, setting descriptions and shortcut values to screen readers.
+- Let Tab leave shortcut recording, and let Esc cancel recording without closing the control panel.
+- Open library cards with Enter or Space, and show their action buttons during keyboard focus. Shift+F10 opens the item menu.
+- Keep the language selector populated when the saved code uses regional casing such as pt-BR.
+
 ## [0.1.2] - 2026-10-18
 
 ### Changed

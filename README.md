@@ -134,7 +134,7 @@ Everything stays on your PC. Screenshots and notes live in `%APPDATA%\Jemur`. Th
 
 ## Languages
 
-English and Bahasa Indonesia are included. Adding a language is a single JSON file and no code — see [docs/TRANSLATING.md](docs/TRANSLATING.md).
+English, Bahasa Indonesia, Spanish, Portuguese (Brazil), Japanese and Bahasa Melayu are included. Adding a language is a single JSON file and no code — see [docs/TRANSLATING.md](docs/TRANSLATING.md). Native speakers are welcome to suggest wording improvements.
 
 ## Build from source
 
