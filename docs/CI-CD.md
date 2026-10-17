@@ -122,9 +122,9 @@ from the same commit; correct uploads are retained and incomplete draft assets
 are replaced before publication.
 
 Store `JEMUR_RELEASE_TOKEN` as a **secret build variable** on the Jemur trigger
-in the Syeana account, not as a Worker binding or repository file. The configured
-token expires on 17 October 2027; replace the build secret with a new token
-before then. Missing or expired credentials cause the release step to fail
+in the Syeana account, not as a Worker binding or repository file. Check the
+token's expiration in GitHub and replace the build secret before that date.
+Missing or expired credentials cause the release step to fail
 visibly. Other repositories and account-level permissions are not required.
 
 Workers requests and build minutes use the account's existing plan and limits.
