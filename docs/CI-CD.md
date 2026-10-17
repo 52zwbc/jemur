@@ -2,7 +2,9 @@
 
 Jemur builds and publishes downloads using Cloudflare Workers Builds in the
 **Syeana** account (`c595078d172b45beb8df900b7cbb24cb`). GitHub hosts the source;
-GitHub Actions is not used. Pushing a version tag alone does not publish a build.
+GitHub Actions is not used. Every successful `main` build publishes a GitHub
+Release automatically when its application version has not been released yet.
+Pushing a version tag alone does not publish a build.
 
 ## Cloudflare settings
 
@@ -13,7 +15,9 @@ GitHub Actions is not used. Pushing a version tag alone does not publish a build
 - Build command: `bash .cloudflare/build.sh`
 - Deploy command: `bash .cloudflare/deploy.sh`
 - Dependency installation: `npm ci` from the committed lockfile
-- No R2 binding, GitHub token or application data is needed
+- No R2 binding or application data is needed
+- Build secret: `JEMUR_RELEASE_TOKEN`, a fine-grained GitHub token with
+  Contents read/write for `revanapriyandi/jemur` only, plus required Metadata read
 
 The Worker is configured in `wrangler.jsonc`. Build/deploy permissions are supplied
 by Cloudflare's build integration; do not commit tokens. The `.NET 10.0.402` SDK is
@@ -47,6 +51,10 @@ installed from Microsoft's official installer when it is not available.
    public EXEs to check byte counts, SHA-256 and Windows executable magic. It
    retries health and manifest checks while the new deployment propagates,
    requiring both endpoints to report the expected commit before downloading.
+8. `.cloudflare/release.mjs` creates a version tag at the exact manifest commit,
+   creates a draft GitHub release, uploads the four EXEs, manifest and checksums,
+   verifies GitHub's asset sizes and SHA-256 digests, then publishes the release.
+   An upload failure leaves the release as a draft for a later retry.
 
 Run the complete suite on Windows before publishing:
 
@@ -95,10 +103,29 @@ SHA256`. Old `-standalone` links redirect to the corresponding portable EXE.
 Cloudflare tracks the latest successful `main` build. Failed builds leave the
 previous deployment active.
 
-A maintainer publishes versioned GitHub Releases separately using the verified
-four EXEs, manifest and checksums, targeting the exact manifest commit. This uses
-GitHub's release API and does not require GitHub Actions. Version tags alone do
-not create builds or releases. Keep published version tags immutable.
+## Automatic GitHub Releases
+
+Bump `<Version>` in `src/Jemur.csproj`, add the corresponding changelog entry,
+run the Windows checks and push to `main`. Cloudflare automatically builds,
+deploys, checks public downloads and publishes `v<Version>` with all six assets.
+Release notes include the changelog entry and source commit. A prerelease version
+containing a hyphen is published as a GitHub prerelease.
+
+If the version is already published, the release step reports that it was
+skipped and never replaces its tag or assets. Increase the application version
+to publish a new release. Cloudflare's latest-build links still update on every
+successful push, so they may be newer than the last versioned release.
+
+Never move published version tags. A pre-existing tag or draft targeting another
+commit makes the build fail rather than overwrite it. A failed draft can resume
+from the same commit; correct uploads are retained and incomplete draft assets
+are replaced before publication.
+
+Store `JEMUR_RELEASE_TOKEN` as a **secret build variable** on the Jemur trigger
+in the Syeana account, not as a Worker binding or repository file. The configured
+token expires on 17 October 2027; replace the build secret with a new token
+before then. Missing or expired credentials cause the release step to fail
+visibly. Other repositories and account-level permissions are not required.
 
 Workers requests and build minutes use the account's existing plan and limits.
 No paid plan or additional storage subscription is enabled by this setup.

@@ -11,6 +11,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Changed
 - Application downloads are self-contained portable EXEs and setup EXEs instead of ZIPs.
 - Cloudflare builds both installer architectures on Linux and verifies all four public executable downloads.
+- Successful Cloudflare builds automatically create a GitHub Release for each new application version, after checking all uploaded asset hashes.
 - Download chunks are fetched on demand to keep streaming connections bounded.
 
 ## [0.1.0] — 2026-10-17
