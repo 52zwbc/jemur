@@ -17,6 +17,9 @@ internal sealed class HotkeyRecorder : StackPanel
     private readonly Action<bool> _recording;
     private Hotkey? _value;
     private bool _listening;
+    internal Button InputButton => _button;
+    internal bool IsRecording => _listening;
+    internal void RefreshLabel() => Render();
 
     /// <param name="apply">Called with the new shortcut (null = cleared); return false to reject it.</param>
     /// <param name="recording">Lets the owner release global shortcuts while recording, so they can be pressed here.</param>
@@ -66,6 +69,12 @@ internal sealed class HotkeyRecorder : StackPanel
         if (!_listening) return;
         e.Handled = true;
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Tab && (Keyboard.Modifiers & ~ModifierKeys.Shift) == ModifierKeys.None)
+        {
+            Stop();
+            e.Handled = false;
+            return;
+        }
         if (key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None) { Stop(); return; }
         if ((key == Key.Back || key == Key.Delete) && Keyboard.Modifiers == ModifierKeys.None)
         {
@@ -95,6 +104,9 @@ internal sealed class HotkeyRecorder : StackPanel
 
     private void Render()
     {
+        var label = (System.Windows.Automation.AutomationProperties.GetLabeledBy(_button) as TextBlock)?.Text;
+        var value = _listening ? L.T("hotkey.listening") : _value?.ToString() ?? L.T("hotkey.none");
+        Ui.AutomationName(_button, label == null ? value : $"{label}: {value}");
         if (_listening) _button.Content = Ui.Text(L.T("hotkey.listening"), Ui.Type.Body, "J.TextSecondary");
         else if (_value is { } v) _button.Content = Ui.KeyCaps(v);
         else _button.Content = Ui.Text(L.T("hotkey.none"), Ui.Type.Body, "J.TextSecondary");

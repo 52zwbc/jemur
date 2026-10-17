@@ -56,7 +56,7 @@ internal sealed class ControlPanel : Window
         };
         PreviewKeyDown += (_, e) =>
         {
-            if (e.Key == Key.Escape) Close();
+            if (e.Key == Key.Escape && !IsRecordingShortcut(e.OriginalSource as DependencyObject)) Close();
             else if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control && _page == Page.Line) { _focusSearch = true; Navigate(Page.Line); e.Handled = true; }
         };
         Navigate(Page.Line);
@@ -64,6 +64,13 @@ internal sealed class ControlPanel : Window
     }
 
     private bool _focusSearch;
+
+    private static bool IsRecordingShortcut(DependencyObject? source)
+    {
+        for (var d = source; d != null; d = d is Visual ? VisualTreeHelper.GetParent(d) : LogicalTreeHelper.GetParent(d))
+            if (d is HotkeyRecorder recorder) return recorder.IsRecording;
+        return false;
+    }
 
     private System.Windows.Threading.DispatcherTimer? _refresh;
 
@@ -125,6 +132,7 @@ internal sealed class ControlPanel : Window
 
     private void BuildNav()
     {
+        bool restoreFocus = _nav.Values.Any(button => button.IsKeyboardFocusWithin);
         _navPanel.Children.Clear();
         _nav.Clear();
         void add(Page p, string glyph, string text, int? badge = null)
@@ -151,6 +159,7 @@ internal sealed class ControlPanel : Window
         add(Page.Discarded, "", L.T("nav.discarded"), _app.Library.Discarded.Count);
         add(Page.Settings, "", L.T("nav.settings"));
         add(Page.About, "", L.T("nav.about"));
+        if (restoreFocus) _nav[_page].Focus();
     }
 
     private void Navigate(Page p, bool animate = true)
@@ -328,7 +337,17 @@ internal sealed class ControlPanel : Window
                 TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis, LineHeight = 20, Opacity = string.IsNullOrWhiteSpace(it.Text) ? 0.45 : 1,
             };
         }
-        thumb.Children.Add(frame);
+        string title = it.Kind == ItemKind.Image ? L.T("kind.screenshot") : FirstLine(it.Text) ?? L.T("kind.note");
+        if (discarded) thumb.Children.Add(frame);
+        else
+        {
+            var open = Ui.Button(title, () => _app.Spotlight(it), Ui.Kind.Subtle);
+            open.Content = frame;
+            open.Padding = new Thickness(0);
+            open.HorizontalContentAlignment = HorizontalAlignment.Stretch;
+            open.VerticalContentAlignment = VerticalAlignment.Stretch;
+            thumb.Children.Add(open);
+        }
 
         // hover actions, top-right
         var actions = new StackPanel { Orientation = Orientation.Horizontal };
@@ -355,7 +374,6 @@ internal sealed class ControlPanel : Window
         root.Children.Add(thumb);
 
         // caption
-        string title = it.Kind == ItemKind.Image ? L.T("kind.screenshot") : FirstLine(it.Text) ?? L.T("kind.note");
         var t = Ui.Text(title);
         t.Margin = new Thickness(2, 9, 2, 0);
         root.Children.Add(t);
@@ -365,12 +383,30 @@ internal sealed class ControlPanel : Window
         s.Margin = new Thickness(2, 1, 2, 0);
         root.Children.Add(s);
 
-        root.MouseEnter += (_, _) => { bar.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromMilliseconds(100))); frame.SetResourceReference(Border.BorderBrushProperty, "J.ControlStrokeBottom"); };
-        root.MouseLeave += (_, _) => { bar.BeginAnimation(OpacityProperty, new DoubleAnimation(0, TimeSpan.FromMilliseconds(140))); frame.SetResourceReference(Border.BorderBrushProperty, "J.CardStroke"); };
+        void revealActions()
+        {
+            bool visible = root.IsMouseOver || root.IsKeyboardFocusWithin;
+            bar.BeginAnimation(OpacityProperty, new DoubleAnimation(visible ? 1 : 0, TimeSpan.FromMilliseconds(100)));
+            bar.IsHitTestVisible = visible;
+            frame.SetResourceReference(Border.BorderBrushProperty, visible ? "J.ControlStrokeBottom" : "J.CardStroke");
+        }
+        bar.IsHitTestVisible = false;
+        root.MouseEnter += (_, _) => revealActions();
+        root.MouseLeave += (_, _) => revealActions();
+        root.IsKeyboardFocusWithinChanged += (_, _) => revealActions();
         if (!discarded)
         {
             root.MouseLeftButtonUp += (_, e) => { if (!IsInsideButton(e.OriginalSource as DependencyObject)) _app.Spotlight(it); };
             root.MouseRightButtonUp += (_, e) => { _app.ShowItemMenu(it, root); e.Handled = true; };
+            root.PreviewKeyDown += (_, e) =>
+            {
+                var key = e.Key == Key.System ? e.SystemKey : e.Key;
+                if (key == Key.Apps || (key == Key.F10 && Keyboard.Modifiers == ModifierKeys.Shift))
+                {
+                    _app.ShowItemMenu(it, Keyboard.FocusedElement as FrameworkElement ?? root, keyboard: true);
+                    e.Handled = true;
+                }
+            };
         }
         Ui.AutomationName(root, title);
         return root;
@@ -428,7 +464,8 @@ internal sealed class ControlPanel : Window
             Ui.DropDown(new[] { ("system", L.T("settings.themeSystem")), ("light", L.T("settings.themeLight")), ("dark", L.T("settings.themeDark")) }, s.Theme, _app.SetTheme, 210)));
         var langs = new List<(string, string)> { ("auto", L.T("settings.languageAuto")) };
         langs.AddRange(L.Available.Select(l => (l.Code, l.Name)));
-        list.Children.Add(Ui.SettingsCard("", L.T("settings.language"), L.T("settings.languageDesc"), Ui.DropDown(langs, s.Language, _app.SetLanguage, 210)));
+        string language = s.Language.Equals("auto", StringComparison.OrdinalIgnoreCase) ? "auto" : L.Code.ToLowerInvariant();
+        list.Children.Add(Ui.SettingsCard("", L.T("settings.language"), L.T("settings.languageDesc"), Ui.DropDown(langs, language, _app.SetLanguage, 210)));
         list.Children.Add(Ui.SettingsCard("", L.T("settings.cardSize"), L.T("settings.cardSizeDesc"),
             Ui.DropDown(new[] { (0, L.T("settings.small")), (1, L.T("settings.medium")), (2, L.T("settings.large")) }, s.CardSize, _app.SetCardSize, 210)));
 

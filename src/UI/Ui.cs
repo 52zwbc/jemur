@@ -59,6 +59,7 @@ internal static class Ui
             b.Content = sp;
         }
         b.Click += (_, _) => onClick();
+        if (text.Length > 0) AutomationName(b, text);
         return b;
     }
 
@@ -131,7 +132,12 @@ internal static class Ui
         var b = new Button { Content = dp, MinWidth = minWidth, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         b.SetResourceReference(FrameworkElement.StyleProperty, "J.Button");
         var current = selected;
-        void refresh() => label.Text = options.FirstOrDefault(o => EqualityComparer<T>.Default.Equals(o.Value, current)).Label ?? "";
+        void refresh()
+        {
+            label.Text = options.FirstOrDefault(o => EqualityComparer<T>.Default.Equals(o.Value, current)).Label ?? "";
+            var title = (System.Windows.Automation.AutomationProperties.GetLabeledBy(b) as TextBlock)?.Text;
+            AutomationName(b, title == null ? label.Text : $"{title}: {label.Text}");
+        }
         refresh();
         b.Click += (_, _) =>
         {
@@ -170,7 +176,20 @@ internal static class Ui
             row.Children.Add(control);
         }
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        text.Children.Add(Text(title));
+        var titleBlock = Text(title);
+        text.Children.Add(titleBlock);
+        var input = control is HotkeyRecorder recorder ? recorder.InputButton : control;
+        if (input != null)
+        {
+            System.Windows.Automation.AutomationProperties.SetLabeledBy(input, titleBlock);
+            System.Windows.Automation.AutomationProperties.SetHelpText(input, description ?? "");
+            if (control is HotkeyRecorder hotkey) hotkey.RefreshLabel();
+            else
+            {
+                var value = System.Windows.Automation.AutomationProperties.GetName(input);
+                AutomationName(input, input is ToggleButton || string.IsNullOrEmpty(value) ? title : $"{title}: {value}");
+            }
+        }
         if (!string.IsNullOrEmpty(description))
         {
             var d = Wrap(description, Type.Caption);
@@ -194,6 +213,7 @@ internal static class Ui
         var t = new TextBox { Text = text };
         t.SetResourceReference(FrameworkElement.StyleProperty, "J.TextBox");
         System.Windows.Automation.AutomationProperties.SetHelpText(t, placeholder);
+        AutomationName(t, placeholder);
         return t;
     }
 

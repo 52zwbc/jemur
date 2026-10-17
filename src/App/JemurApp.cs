@@ -427,9 +427,9 @@ internal sealed class JemurApp
 
     // ───────────── menus ─────────────
 
-    public void ShowItemMenu(HangItem item, FrameworkElement target)
+    public void ShowItemMenu(HangItem item, FrameworkElement target, bool keyboard = false)
     {
-        var m = new ContextMenu { PlacementTarget = target, Placement = PlacementMode.MousePoint };
+        var m = new ContextMenu { PlacementTarget = target, Placement = keyboard ? PlacementMode.Bottom : PlacementMode.MousePoint };
         bool img = item.Kind == ItemKind.Image;
         m.Items.Add(Ui.MenuItem(L.T(img ? "action.view" : "action.openNote"), () => Spotlight(item), img ? "" : ""));
         m.Items.Add(Ui.MenuItem(L.T("action.copy"), () => Copy(item), ""));
@@ -442,7 +442,7 @@ internal sealed class JemurApp
         }
         else
         {
-            var swatches = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 4) };
+            m.Items.Add(new Separator());
             for (int i = 0; i < NoteColors.Count; i++)
             {
                 int idx = i;
@@ -452,16 +452,17 @@ internal sealed class JemurApp
                     Background = new SolidColorBrush(NoteColors.Paper(i)), ToolTip = L.T(NoteColors.Keys[i]),
                 };
                 sw.SetResourceReference(Border.BorderBrushProperty, item.Color == i ? "J.Text" : "J.ControlStrokeBottom");
-                sw.PreviewMouseLeftButtonUp += (_, _) => { item.Color = idx; Library.Touch(item); };
-                swatches.Children.Add(sw);
+                var choice = Ui.MenuItem($"{L.T("action.noteColor")}: {L.T(NoteColors.Keys[i])}", () => { item.Color = idx; Library.Touch(item); }, isChecked: item.Color == i);
+                choice.Icon = sw;
+                m.Items.Add(choice);
             }
-            m.Items.Add(new MenuItem { Header = swatches, Icon = Ui.Glyph("", 16) });
         }
         m.Items.Add(new Separator());
         m.Items.Add(Ui.MenuItem(L.T("action.discard"), () => Discard(item), "", L.T("hint.dragOff"), critical: true));
 
         Line.MenuOpen = true;
-        m.Closed += (_, _) => Line.MenuOpen = false;
+        m.Closed += (_, _) => { Line.MenuOpen = false; if (keyboard) target.Focus(); };
+        if (keyboard) m.Opened += (_, _) => ((MenuItem)m.Items[0]).Focus();
         m.IsOpen = true;
     }
 

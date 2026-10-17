@@ -21,6 +21,7 @@
   "action.quit": "Quit Jemur",
   "action.view": "View",
   "action.openNote": "Open note",
+  "action.noteColor": "Note color",
   "action.copy": "Copy",
   "action.markup": "Mark up",
   "action.open": "Open",
