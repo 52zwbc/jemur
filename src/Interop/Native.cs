@@ -1,0 +1,151 @@
+using System.Runtime.InteropServices;
+using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
+
+namespace Jemur.Interop;
+
+/// <summary>Win32 entry points. Kept in one file so it's obvious what Jemur asks of the OS.</summary>
+internal static partial class Native
+{
+    // ───────────── structs ─────────────
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; public readonly int Width => Right - Left; public readonly int Height => Bottom - Top; }
+    [StructLayout(LayoutKind.Sequential)] public struct MARGINS { public int Left, Right, Top, Bottom; }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public struct MONITORINFO { public int cbSize; public RECT rcMonitor; public RECT rcWork; public uint dwFlags; }
+
+    // ───────────── user32 ─────────────
+    [LibraryImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool RegisterHotKey(IntPtr hWnd, int id, uint mods, uint vk);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool UnregisterHotKey(IntPtr hWnd, int id);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetCursorPos(out POINT p);
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] public static partial IntPtr GetWindowLongPtr(IntPtr h, int i);
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] public static partial IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetForegroundWindow(IntPtr h);
+    [LibraryImport("user32.dll")] public static partial IntPtr GetForegroundWindow();
+    [LibraryImport("user32.dll")] public static partial uint GetWindowThreadProcessId(IntPtr h, IntPtr pid);
+    [LibraryImport("user32.dll")] public static partial uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+    [LibraryImport("kernel32.dll")] public static partial uint GetCurrentThreadId();
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool AttachThreadInput(uint a, uint b, [MarshalAs(UnmanagedType.Bool)] bool attach);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool BringWindowToTop(IntPtr h);
+    [LibraryImport("user32.dll")] public static partial void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
+    [LibraryImport("user32.dll")] public static partial IntPtr MonitorFromPoint(POINT pt, uint flags);
+    [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetMonitorInfo(IntPtr hMon, ref MONITORINFO info);
+    [LibraryImport("user32.dll")] public static partial IntPtr GetDC(IntPtr h);
+    [LibraryImport("user32.dll")] public static partial int ReleaseDC(IntPtr h, IntPtr dc);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DestroyIcon(IntPtr h);
+    [LibraryImport("user32.dll")] public static partial IntPtr CreateIconFromResourceEx(IntPtr data, uint size, [MarshalAs(UnmanagedType.Bool)] bool icon, uint ver, int cx, int cy, uint flags);
+    [LibraryImport("user32.dll")] public static partial int GetSystemMetricsForDpi(int index, uint dpi);
+    [LibraryImport("user32.dll")] public static partial uint GetDpiForSystem();
+    [LibraryImport("user32.dll", EntryPoint = "RegisterWindowMessageW", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial uint RegisterWindowMessage(string name);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsWindowVisible(IntPtr h);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool IsIconic(IntPtr h);
+    [LibraryImport("user32.dll")] public static partial IntPtr GetWindow(IntPtr h, uint cmd);
+    [LibraryImport("user32.dll")] public static partial IntPtr GetTopWindow(IntPtr h);
+
+    public const int GWL_EXSTYLE = -20;
+    public const int WS_EX_TRANSPARENT = 0x20, WS_EX_TOOLWINDOW = 0x80, WS_EX_LAYERED = 0x80000, WS_EX_APPWINDOW = 0x40000, WS_EX_NOACTIVATE = 0x08000000;
+    public const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_SHIFT = 4, MOD_WIN = 8, MOD_NOREPEAT = 0x4000;
+    public const int WM_HOTKEY = 0x0312, WM_DISPLAYCHANGE = 0x007E, WM_SETTINGCHANGE = 0x001A, WM_DPICHANGED = 0x02E0;
+    public const uint SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
+    public const uint GW_HWNDNEXT = 2;
+    public const uint MONITOR_DEFAULTTONEAREST = 2;
+
+    // ───────────── gdi32 ─────────────
+    [LibraryImport("gdi32.dll")] public static partial IntPtr CreateCompatibleDC(IntPtr dc);
+    [LibraryImport("gdi32.dll")] public static partial IntPtr CreateCompatibleBitmap(IntPtr dc, int w, int h);
+    [LibraryImport("gdi32.dll")] public static partial IntPtr SelectObject(IntPtr dc, IntPtr obj);
+    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool BitBlt(IntPtr dst, int x, int y, int w, int h, IntPtr src, int sx, int sy, uint rop);
+    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeleteObject(IntPtr obj);
+    [LibraryImport("gdi32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeleteDC(IntPtr dc);
+    public const uint SRCCOPY = 0x00CC0020, CAPTUREBLT = 0x40000000;
+
+    // ───────────── dwmapi ─────────────
+    [LibraryImport("dwmapi.dll")] public static partial int DwmSetWindowAttribute(IntPtr h, int attr, ref int value, int size);
+    [LibraryImport("dwmapi.dll")] public static partial int DwmGetWindowAttribute(IntPtr h, int attr, out RECT value, int size);
+    [LibraryImport("dwmapi.dll")] public static partial int DwmGetWindowAttribute(IntPtr h, int attr, out int value, int size);
+    [LibraryImport("dwmapi.dll")] public static partial int DwmExtendFrameIntoClientArea(IntPtr h, ref MARGINS m);
+    public const int DWMWA_CLOAKED = 14, DWMWA_EXTENDED_FRAME_BOUNDS = 9, DWMWA_USE_IMMERSIVE_DARK_MODE = 20,
+        DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWA_SYSTEMBACKDROP_TYPE = 38;
+
+    // ───────────── kernel32 / psapi ─────────────
+    [LibraryImport("kernel32.dll")] public static partial IntPtr GetCurrentProcess();
+    [LibraryImport("kernel32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool SetProcessWorkingSetSizeEx(IntPtr proc, nint min, nint max, uint flags);
+
+    // ───────────── helpers ─────────────
+
+    public static IntPtr Handle(Window w) => new WindowInteropHelper(w).Handle;
+
+    /// <summary>Hide from Alt+Tab / taskbar; optionally let every mouse event fall through.</summary>
+    public static void MakeToolWindow(Window w, bool clickThrough = false, bool noActivate = false)
+    {
+        var h = Handle(w);
+        long s = GetWindowLongPtr(h, GWL_EXSTYLE).ToInt64();
+        s = (s | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW;
+        if (clickThrough) s |= WS_EX_TRANSPARENT | WS_EX_LAYERED;
+        if (noActivate || clickThrough) s |= WS_EX_NOACTIVATE;
+        SetWindowLongPtr(h, GWL_EXSTYLE, new IntPtr(s));
+    }
+
+    /// <summary>Cursor position in the device-independent units of <paramref name="reference"/>.</summary>
+    public static Point CursorDip(Visual reference)
+    {
+        GetCursorPos(out var p);
+        var src = PresentationSource.FromVisual(reference);
+        var pt = new Point(p.X, p.Y);
+        return src?.CompositionTarget != null ? src.CompositionTarget.TransformFromDevice.Transform(pt) : pt;
+    }
+
+    /// <summary>
+    /// Brings a window to the front even when Jemur isn't the active app (e.g. after a global shortcut).
+    /// Windows normally refuses this; attaching to the foreground thread's input queue is the documented workaround.
+    /// </summary>
+    public static void ForceForeground(Window w)
+    {
+        var h = Handle(w);
+        if (h == IntPtr.Zero) return;
+        var fg = GetForegroundWindow();
+        if (fg == h) { w.Activate(); return; }
+        uint fgThread = GetWindowThreadProcessId(fg, IntPtr.Zero), me = GetCurrentThreadId();
+        bool attached = fgThread != 0 && fgThread != me && AttachThreadInput(me, fgThread, true);
+        try
+        {
+            if (!attached)
+            {
+                // Fallback: a synthetic Alt tap lifts the foreground lock.
+                keybd_event(0x12, 0, 0, UIntPtr.Zero);
+                keybd_event(0x12, 0, 2, UIntPtr.Zero);
+            }
+            BringWindowToTop(h);
+            SetForegroundWindow(h);
+            w.Activate();
+        }
+        finally { if (attached) AttachThreadInput(me, fgThread, false); }
+    }
+
+    public static RECT MonitorAt(POINT pt, bool workArea = false)
+    {
+        var mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        GetMonitorInfo(mon, ref info);
+        return workArea ? info.rcWork : info.rcMonitor;
+    }
+}

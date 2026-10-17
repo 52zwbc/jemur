@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Jemur</AssemblyName>
+    <RootNamespace>Jemur</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\jemur.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+    <Product>Jemur</Product>
+    <Description>Hang screenshots and notes on a clothesline across the top of your screen.</Description>
+    <!-- Only ship English framework resources; our own UI strings live in /locales. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <!-- Memory: a tray app idles 99% of the time, so favour a small heap over throughput. -->
+  <PropertyGroup>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <TieredPGO>false</TieredPGO>
+  </PropertyGroup>
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="7" />
+    <RuntimeHostConfigurationOption Include="System.GC.RetainVM" Value="false" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\jemur.ico" />
+    <Resource Include="Assets\logo-256.png" />
+    <EmbeddedResource Include="Assets\tray-light.ico" LogicalName="tray-light.ico" />
+    <EmbeddedResource Include="Assets\tray-dark.ico" LogicalName="tray-dark.ico" />
+    <EmbeddedResource Include="..\locales\*.json" LogicalName="locales.%(Filename).json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Jemur.Tests" />
+  </ItemGroup>
+
+</Project>
