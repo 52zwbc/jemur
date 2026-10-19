@@ -96,6 +96,10 @@
   "rope.namePrompt": "Line name",
   "rope.moveTo": "Move to line",
   "rope.tagName": "Line: {0}",
+  "pin.toDesktop": "Pin to desktop",
+  "pin.back": "Back on the line",
+  "pin.limit": "Up to 3 pins per line",
+  "pin.name": "Pinned: {0}",
   "rope.emptyTitle": "Nothing on {0} yet",
 
   "filter.all": "All ({0})",

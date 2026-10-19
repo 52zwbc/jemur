@@ -1,7 +1,10 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using Jemur.Core;
 using Jemur.Interop;
 
 namespace Jemur.Windows;
@@ -46,6 +49,50 @@ internal sealed class GhostWindow : Window
         Top = top - Pad;
         _tilt.Angle = angle;
         Show();
+    }
+
+    private Point _cardPx;
+
+    /// <summary>Shows the ghost with its card's top-left at a point in physical pixels (any monitor, any DPI).</summary>
+    public void ShowAtPx(Point cardPx, double angle)
+    {
+        _tilt.Angle = angle;
+        new WindowInteropHelper(this).EnsureHandle();
+        MoveCard(cardPx);
+        MoveCard(cardPx); // the first move can change the window's DPI; the second one uses it
+        Show();
+    }
+
+    private void MoveCard(Point cardPx)
+    {
+        _cardPx = cardPx;
+        var h = Native.Handle(this);
+        var w = LineLayout.WindowForCard(cardPx, new Vector(Pad, Pad), Native.GetDpiForWindow(h) / 96.0);
+        Native.MoveTo(h, w.X, w.Y);
+    }
+
+    /// <summary>
+    /// Carries the card on a short arc to <paramref name="toPx"/> with a small tilt, then closes and calls <paramref name="landed"/>.
+    /// Moves in physical pixels frame by frame, so it stays right when it crosses monitors with different scaling.
+    /// </summary>
+    public void FlyTo(Point toPx, int ms, Action landed)
+    {
+        var from = _cardPx;
+        double tilt0 = _tilt.Angle, lift = Math.Min(90, (toPx - from).Length * 0.3);
+        var clock = Stopwatch.StartNew();
+        EventHandler? frame = null;
+        frame = (_, _) =>
+        {
+            double t = Math.Min(1, clock.Elapsed.TotalMilliseconds / ms);
+            double e = t < 0.5 ? 4 * t * t * t : 1 - Math.Pow(-2 * t + 2, 3) / 2; // cubic in-out
+            MoveCard(new Point(from.X + (toPx.X - from.X) * e, from.Y + (toPx.Y - from.Y) * e - lift * Math.Sin(Math.PI * t)));
+            _tilt.Angle = tilt0 * (1 - e) - 8 * Math.Sin(Math.PI * t);
+            if (t < 1) return;
+            CompositionTarget.Rendering -= frame;
+            Close();
+            landed();
+        };
+        CompositionTarget.Rendering += frame;
     }
 
     public void Fall()

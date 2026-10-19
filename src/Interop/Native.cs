@@ -56,12 +56,18 @@ internal static partial class Native
     public static partial bool IsIconic(IntPtr h);
     [LibraryImport("user32.dll")] public static partial IntPtr GetWindow(IntPtr h, uint cmd);
     [LibraryImport("user32.dll")] public static partial IntPtr GetTopWindow(IntPtr h);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetWindowRect(IntPtr h, out RECT r);
+    [LibraryImport("user32.dll")] public static partial uint GetDpiForWindow(IntPtr h);
+    [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static unsafe partial bool EnumDisplayMonitors(IntPtr dc, IntPtr clip, delegate* unmanaged<IntPtr, IntPtr, RECT*, IntPtr, int> proc, IntPtr data);
+    [LibraryImport("shcore.dll")] private static partial int GetDpiForMonitor(IntPtr hMon, int type, out uint dpiX, out uint dpiY);
 
     public const int GWL_EXSTYLE = -20;
     public const int WS_EX_TRANSPARENT = 0x20, WS_EX_TOOLWINDOW = 0x80, WS_EX_LAYERED = 0x80000, WS_EX_APPWINDOW = 0x40000, WS_EX_NOACTIVATE = 0x08000000;
     public const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_SHIFT = 4, MOD_WIN = 8, MOD_NOREPEAT = 0x4000;
     public const int WM_HOTKEY = 0x0312, WM_DISPLAYCHANGE = 0x007E, WM_SETTINGCHANGE = 0x001A, WM_DPICHANGED = 0x02E0;
-    public const uint SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
+    public const uint SWP_NOSIZE = 0x1, SWP_NOZORDER = 0x4, SWP_NOACTIVATE = 0x10;
     public const uint GW_HWNDNEXT = 2;
     public const uint MONITOR_DEFAULTTONEAREST = 2;
 
@@ -147,5 +153,35 @@ internal static partial class Native
         var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
         GetMonitorInfo(mon, ref info);
         return workArea ? info.rcWork : info.rcMonitor;
+    }
+
+    /// <summary>DPI scale (1.0 = 96 dpi) of the monitor nearest a point in physical pixels.</summary>
+    public static double ScaleAt(Point px)
+    {
+        var mon = MonitorFromPoint(new POINT { X = (int)Math.Round(px.X), Y = (int)Math.Round(px.Y) }, MONITOR_DEFAULTTONEAREST);
+        return GetDpiForMonitor(mon, 0, out var dpi, out _) == 0 && dpi > 0 ? dpi / 96.0 : GetDpiForSystem() / 96.0;
+    }
+
+    /// <summary>Moves a window's top-left to a point in physical pixels, keeping its size and z-order.</summary>
+    public static void MoveTo(IntPtr h, double x, double y) =>
+        SetWindowPos(h, IntPtr.Zero, (int)Math.Round(x), (int)Math.Round(y), 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+    /// <summary>The work area (screen minus taskbar) of every monitor, in physical pixels.</summary>
+    public static unsafe List<Rect> WorkAreas()
+    {
+        var list = new List<Rect>();
+        var gc = GCHandle.Alloc(list);
+        try { EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, &CollectWorkArea, GCHandle.ToIntPtr(gc)); }
+        finally { gc.Free(); }
+        return list;
+    }
+
+    [UnmanagedCallersOnly]
+    private static unsafe int CollectWorkArea(IntPtr mon, IntPtr dc, RECT* bounds, IntPtr data)
+    {
+        var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+        if (GetMonitorInfo(mon, ref info))
+            ((List<Rect>)GCHandle.FromIntPtr(data).Target!).Add(new Rect(info.rcWork.Left, info.rcWork.Top, info.rcWork.Width, info.rcWork.Height));
+        return 1;
     }
 }

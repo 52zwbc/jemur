@@ -96,6 +96,10 @@
   "rope.namePrompt": "Nama tali",
   "rope.moveTo": "Pindah ke tali",
   "rope.tagName": "Tali: {0}",
+  "pin.toDesktop": "Jepit di desktop",
+  "pin.back": "Kembalikan ke jemuran",
+  "pin.limit": "Paling banyak 3 jepitan per tali",
+  "pin.name": "Dijepit: {0}",
   "rope.emptyTitle": "Belum ada apa-apa di {0}",
 
   "filter.all": "Semua ({0})",

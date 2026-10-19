@@ -37,4 +37,21 @@ public sealed class LineLayoutTests
     [Fact]
     public void Clamp_KeepsMostlyVisiblePin() =>
         Assert.Equal(new Point(1850, 100), LineLayout.ClampPin(new Rect(1850, 100, 160, 140), Screens));
+
+    [Fact]
+    public void FirstPinSpot_Is200DipBelowTheLineInPixels() =>
+        Assert.Equal(new Point(150, 405), LineLayout.FirstPinSpot(new Point(100, 70), 1.5));
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    [InlineData(1.75)]
+    public void CardAndWindowOffsetsRoundTrip(double scale)
+    {
+        var card = new Point(2400, 300);
+        var pad = new Vector(92, 28);
+        var window = LineLayout.WindowForCard(card, pad, scale);
+        Assert.Equal(new Point(2400 - 92 * scale, 300 - 28 * scale), window);
+        Assert.Equal(card, LineLayout.CardInWindow(window, pad, scale));
+    }
 }

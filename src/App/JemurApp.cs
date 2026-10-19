@@ -40,6 +40,7 @@ internal sealed class JemurApp
     public Settings Settings { get; private set; } = new();
     public Library Library { get; } = new();
     public LineWindow Line { get; private set; } = null!;
+    public PinBoard Pins { get; private set; } = null!;
     public bool HasOverlay => _spotlight != null || _markup != null || _capturing;
     internal IUpdateChecker UpdateChecker { get; private set; } = null!;
 
@@ -112,6 +113,7 @@ internal sealed class JemurApp
         Line = new LineWindow(this) { AutoHide = Settings.AutoHide };
         if (Settings.Lifted) Line.SetLifted(true, animate: false);
         else if (Line.StaysOut) Line.Show();
+        Pins = new PinBoard(this);
         Library.Changed += () => _tray?.SetTip(TrayTip());
 
         _tray = new TrayIcon();
@@ -171,6 +173,7 @@ internal sealed class JemurApp
         Settings.Lifted = lifted;
         SettingsStore.Save(Settings);
         Line.SetLifted(lifted, animate: true);
+        Pins.SetLifted(lifted, animate: true);
         _tray.SetTip(TrayTip());
     }
 
@@ -198,8 +201,8 @@ internal sealed class JemurApp
         Settings.ActiveRope = ropeId;
         SettingsStore.Save(Settings);
         Line.ShowRope(ropeId, animate: true); // while lifted this swaps the cards out of sight; EnsureVisible then hangs the new ones out
+        Pins.ShowRope(ropeId, animate: true);
         EnsureVisible();
-        // Task 5: Pins.ShowRope(ropeId)
         _tray?.SetTip(TrayTip());
         RopeSwitched?.Invoke();
     }
@@ -238,7 +241,12 @@ internal sealed class JemurApp
     public void MoveToRope(HangItem item, string ropeId)
     {
         if (Library.RopeById(ropeId) == null || item.RopeId == ropeId) return;
-        if (ropeId != ActiveRope) Line.SeeOff(item, L.F("toast.movedTo", RopeName(ropeId)));
+        if (ropeId != ActiveRope)
+        {
+            var toast = L.F("toast.movedTo", RopeName(ropeId));
+            if (item.Pinned) Pins.SeeOff(item, toast);
+            else Line.SeeOff(item, toast);
+        }
         Library.MoveToRope(item, ropeId);
     }
 
@@ -348,7 +356,7 @@ internal sealed class JemurApp
     internal Task<UpdateCheckResult> CheckForUpdatesAsync(CancellationToken cancellationToken) =>
         _updates?.CheckNowAsync(cancellationToken) ?? UpdateChecker.CheckAsync(cancellationToken);
 
-    public void SetLanguage(string code) { Settings.Language = code; SettingsStore.Save(Settings); L.Use(code); Line.Rebuild(); }
+    public void SetLanguage(string code) { Settings.Language = code; SettingsStore.Save(Settings); L.Use(code); Line.Rebuild(); Pins.Rebuild(); }
 
     public void SetCardSize(int size)
     {
@@ -356,6 +364,7 @@ internal sealed class JemurApp
         CardView.Scale = CardScales[Settings.CardSize];
         SettingsStore.Save(Settings);
         Line.Rebuild();
+        Pins.Rebuild();
     }
 
     public void SetAutoHide(bool on) { Settings.AutoHide = on; Line.AutoHide = on; SettingsStore.Save(Settings); }
@@ -393,11 +402,13 @@ internal sealed class JemurApp
             if (panelVisible) _panel!.Hide();
             bool lineVisible = Line.IsVisible;
             Line.Hide();
+            Pins.HideForCapture();
             await Task.Delay(150); // let DWM repaint without our windows
 
             var (shot, bounds) = ScreenCapture.MonitorUnderCursor();
             var windows = ScreenCapture.VisibleWindows(IntPtr.Zero);
             if ((lineVisible || Line.StaysOut) && !Lifted) Line.Show();
+            Pins.RestoreAfterCapture();
 
             var w = new CaptureWindow(shot, bounds, windows);
             w.ShowDialog();
@@ -416,6 +427,7 @@ internal sealed class JemurApp
         finally
         {
             _capturing = false;
+            Pins.RestoreAfterCapture(); // also when the capture threw before the pins came back
             if (panelVisible) _panel?.Show();
             Memory.TrimSoon(); // the full-screen bitmap is the biggest allocation Jemur ever makes
         }
@@ -484,15 +496,15 @@ internal sealed class JemurApp
         if (_spotlight != null) { _spotlight.Dismiss(() => Spotlight(item)); return; }
         if (!Library.Items.Contains(item)) return;
         Line.HoldOpen(800);
-        Line.CardOf(item)?.SetAway(true);
-        var w = new SpotlightWindow(item, this, Line.CardCenter(item));
+        ViewOf(item)?.SetAway(true);
+        var w = new SpotlightWindow(item, this, CardCenter(item));
         _spotlight = w;
         w.Finished += it =>
         {
             _spotlight = null;
-            var c = Line.CardOf(it);
+            var c = ViewOf(it);
             c?.SetAway(false);
-            if (c != null) Line.Kick(it, 70);
+            if (c != null) Kick(it, 70);
             if (it.Kind == ItemKind.Note && string.IsNullOrWhiteSpace(it.Text)) Library.Drop(it);
             Line.HoldOpen(1200);
             Memory.TrimSoon();
@@ -506,7 +518,7 @@ internal sealed class JemurApp
         _markup?.Close();
         var w = new MarkupWindow(item.File);
         _markup = w;
-        w.Saved += () => { var c = Line.CardOf(item); if (c != null) { c.ReloadImage(); c.Toast(L.T("toast.saved")); } Library.Touch(item); };
+        w.Saved += () => { var c = ViewOf(item); if (c != null) { c.ReloadImage(); c.Toast(L.T("toast.saved")); } Library.Touch(item); };
         w.Closed += (_, _) => { _markup = null; Line.HoldOpen(1200); };
         w.Show();
         Native.ForceForeground(w);
@@ -524,14 +536,14 @@ internal sealed class JemurApp
             }
             else data.SetText(item.Text);
             Clipboard.SetDataObject(data, true); // copy=true: hand the data to Windows so we don't keep it alive
-            Line.CardOf(item)?.Toast(L.T("toast.copied"));
+            ViewOf(item)?.Toast(L.T("toast.copied"));
             Memory.TrimSoon();
             return true;
         }
         catch (Exception ex)
         {
             Log.Warn("Copy failed", ex);
-            Line.CardOf(item)?.Toast(L.T("toast.copyFailed"));
+            ViewOf(item)?.Toast(L.T("toast.copyFailed"));
             return false;
         }
     }
@@ -558,11 +570,80 @@ internal sealed class JemurApp
         finally { Line.MenuOpen = false; }
     }
 
-    /// <summary>Lets the card drop off the line, then moves it to Discarded.</summary>
+    /// <summary>Lets the card drop off the line (or the desktop), then moves it to Discarded.</summary>
     public void Discard(HangItem item)
     {
-        Line.LetGo(item);
+        if (item.Pinned) Pins.LetGo(item);
+        else Line.LetGo(item);
         Library.Discard(item);
+    }
+
+    // ───────────── desktop pins ─────────────
+
+    /// <summary>The card showing an item: on the line, or pinned to the desktop.</summary>
+    private CardView? ViewOf(HangItem item) => Line.CardOf(item) ?? Pins.WindowOf(item)?.Card;
+
+    public void Kick(HangItem item, double v)
+    {
+        if (Pins.WindowOf(item) is { } pin) pin.Kick(v);
+        else Line.Kick(item, v);
+    }
+
+    /// <summary>The DPI scale of the primary screen, where the line and the spotlight live.</summary>
+    private static double PrimaryScale => Native.GetDpiForSystem() / 96.0;
+
+    /// <summary>Centre of an item's card in DIPs of the primary screen; for a pin, the centre of the pin.</summary>
+    private Point CardCenter(HangItem item)
+    {
+        if (Pins.WindowOf(item) is not { } pin) return Line.CardCenter(item);
+        var p = pin.CardPx;
+        var size = pin.CardSizePx(pin.Scale);
+        return new Point((p.X + size.Width / 2) / PrimaryScale, (p.Y + size.Height / 2) / PrimaryScale);
+    }
+
+    public bool CanPin(HangItem item) => item.Pinned || Library.PinCount(item.RopeId ?? Rope.DefaultId) < Library.MaxPinsPerRope;
+
+    /// <summary>
+    /// Takes a card off the line onto the desktop. It flies on a short arc to <paramref name="atPx"/> (the card's top-left
+    /// in physical pixels), or the first time to 200 DIP below its spot on the line, else to where it was pinned before.
+    /// With <paramref name="fly"/> false it appears there at once and swings (pinned from the spotlight).
+    /// </summary>
+    public void PinToDesktop(HangItem item, Point? atPx = null, bool fly = true)
+    {
+        if (item.Pinned || !Library.Items.Contains(item) || !CanPin(item) || Line.CardRect(item) is not { } r) return;
+        double s = PrimaryScale;
+        var spot = atPx
+            ?? (item.PinLeft != 0 || item.PinTop != 0 ? new Point(item.PinLeft, item.PinTop) : LineLayout.FirstPinSpot(Line.CardRect(item, resting: true)!.Value.TopLeft, s));
+        spot = LineLayout.ClampPin(new Rect(spot, new Size(r.Width * s, r.Height * s)), Native.WorkAreas());
+
+        GhostWindow? ghost = null;
+        if (fly && Motion.Enabled && Line.IsVisible && !Lifted)
+        {
+            var card = Line.CardOf(item)!;
+            ghost = new GhostWindow(card);
+            ghost.ShowAtPx(new Point(r.X * s, r.Y * s), card.Angle);
+            Pins.Hold(item); // its pin window waits until the flight lands
+        }
+        if (!Library.Pin(item, spot.X, spot.Y)) { ghost?.Close(); Pins.Land(item); return; }
+        ghost?.FlyTo(spot, 380, () => Pins.Land(item));
+    }
+
+    /// <summary>Back on the line: the pin flies back to a free spot on the rope and swings.</summary>
+    public void UnpinToLine(HangItem item)
+    {
+        if (!item.Pinned) return;
+        var pin = Pins.WindowOf(item);
+        GhostWindow? ghost = null;
+        if (pin is { IsVisible: true } && Motion.Enabled && !Lifted)
+        {
+            ghost = new GhostWindow(pin.Card);
+            ghost.ShowAtPx(pin.CardPx, pin.Card.Angle);
+        }
+        Library.Unpin(item); // the pin window closes and the card takes a slot on the line
+        if (ghost == null) return;
+        if (Line.Expect(item) is not { } r) { ghost.Close(); return; }
+        double s = PrimaryScale;
+        ghost.FlyTo(new Point(r.X * s, r.Y * s), 380, () => Line.Land(item));
     }
 
     // ───────────── menus ─────────────
@@ -597,10 +678,11 @@ internal sealed class JemurApp
                 m.Items.Add(choice);
             }
         }
+        m.Items.Add(new Separator());
+        m.Items.Add(PinMenuItem(item));
         var others = Library.Ropes.Where(r => r.Id != item.RopeId).ToList();
         if (others.Count > 0)
         {
-            m.Items.Add(new Separator());
             var move = Ui.MenuItem(L.T("rope.moveTo"), () => { }, "");
             foreach (var r in others)
             {
@@ -610,12 +692,26 @@ internal sealed class JemurApp
             m.Items.Add(move);
         }
         m.Items.Add(new Separator());
-        m.Items.Add(Ui.MenuItem(L.T("action.discard"), () => Discard(item), "", L.T("hint.dragOff"), critical: true));
+        m.Items.Add(Ui.MenuItem(L.T("action.discard"), () => Discard(item), "", item.Pinned ? null : L.T("hint.dragOff"), critical: true));
 
         Line.MenuOpen = true;
         m.Closed += (_, _) => { Line.MenuOpen = false; if (keyboard) target.Focus(); };
         if (keyboard) m.Opened += (_, _) => ((MenuItem)m.Items[0]).Focus();
         m.IsOpen = true;
+    }
+
+    /// <summary>Pin to desktop (disabled at the limit, with a tooltip saying why), or Back on the line for a pin.</summary>
+    private MenuItem PinMenuItem(HangItem item)
+    {
+        if (item.Pinned) return Ui.MenuItem(L.T("pin.back"), () => UnpinToLine(item), "");
+        var mi = Ui.MenuItem(L.T("pin.toDesktop"), () => PinToDesktop(item), "");
+        if (!CanPin(item))
+        {
+            mi.IsEnabled = false;
+            mi.ToolTip = L.T("pin.limit");
+            ToolTipService.SetShowOnDisabled(mi, true);
+        }
+        return mi;
     }
 
     private void ShowTrayMenu()

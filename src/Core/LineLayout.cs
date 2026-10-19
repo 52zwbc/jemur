@@ -5,7 +5,7 @@ namespace Jemur.Core;
 /// <summary>Pure geometry for card groups and desktop pins, kept free of windows so it can be tested.</summary>
 internal static class LineLayout
 {
-    public const double GroupGap = 10;
+    public const double GroupGap = 10, FirstPinDrop = 200;
 
     /// <summary>Centre x of each card when laid out left to right from <paramref name="startX"/>.</summary>
     public static double[] GroupSlots(double startX, IReadOnlyList<double> widths, double gap)
@@ -44,4 +44,19 @@ internal static class LineLayout
         return new Point(Math.Max(near.Left, Math.Min(pin.X, near.Right - pin.Width)),
                          Math.Max(near.Top, Math.Min(pin.Y, near.Bottom - pin.Height)));
     }
+
+    /// <summary>
+    /// Where a card first lands when pinned: <see cref="FirstPinDrop"/> DIP below its spot on the line, in physical pixels.
+    /// The line sits at the origin of the primary screen, so its DIPs scale straight to pixels.
+    /// </summary>
+    public static Point FirstPinSpot(Point cardOnLineDip, double lineScale) =>
+        new(cardOnLineDip.X * lineScale, (cardOnLineDip.Y + FirstPinDrop) * lineScale);
+
+    /// <summary>A window's top-left in physical pixels, for a card held <paramref name="padDip"/> inside it.</summary>
+    public static Point WindowForCard(Point cardPx, Vector padDip, double scale) =>
+        new(cardPx.X - padDip.X * scale, cardPx.Y - padDip.Y * scale);
+
+    /// <summary>The inverse of <see cref="WindowForCard"/>.</summary>
+    public static Point CardInWindow(Point windowPx, Vector padDip, double scale) =>
+        new(windowPx.X + padDip.X * scale, windowPx.Y + padDip.Y * scale);
 }

@@ -393,7 +393,19 @@ internal sealed class ControlPanel : Window
         }
         else
         {
-            act("", L.T("action.copy"), () => { if (_app.Copy(it)) _app.Line.Kick(it, 40); });
+            act("", L.T("action.copy"), () => { if (_app.Copy(it)) _app.Kick(it, 40); });
+            if (it.Pinned) act("", L.T("pin.back"), () => _app.UnpinToLine(it));
+            else
+            {
+                act("", L.T("pin.toDesktop"), () => _app.PinToDesktop(it));
+                if (!_app.CanPin(it))
+                {
+                    var pin = (Button)actions.Children[^1];
+                    pin.IsEnabled = false;
+                    pin.ToolTip = L.T("pin.limit");
+                    ToolTipService.SetShowOnDisabled(pin, true);
+                }
+            }
             if (it.Kind == ItemKind.Image) act("", L.T("action.markup"), () => _app.Markup(it));
             act("", L.T("action.discard"), () => _app.Discard(it));
         }
@@ -455,7 +467,7 @@ internal sealed class ControlPanel : Window
         return false;
     }
 
-    private static string? FirstLine(string text)
+    internal static string? FirstLine(string text)
     {
         var l = text.Split('\n').Select(s => s.Trim()).FirstOrDefault(s => s.Length > 0);
         return l == null ? null : l.Length > 40 ? l[..40] + "…" : l;

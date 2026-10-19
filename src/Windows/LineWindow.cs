@@ -181,6 +181,38 @@ internal sealed class LineWindow : Window
         return new Point(Canvas.GetLeft(c) + c.Width / 2, Canvas.GetTop(c) + c.Slide.Y + c.Height / 2);
     }
 
+    /// <summary>
+    /// An item's card in screen DIPs of the primary screen: where it shows now, or with <paramref name="resting"/> where it hangs
+    /// when the line is out (not tucked away or lifted). Null when it isn't on the line.
+    /// </summary>
+    public Rect? CardRect(HangItem item, bool resting = false)
+    {
+        var c = CardOf(item);
+        return c == null ? null : new Rect(Canvas.GetLeft(c), Canvas.GetTop(c) + (resting ? 0 : c.Slide.Y), c.Width, c.Height);
+    }
+
+    /// <summary>A card is flying back from the desktop: it takes its slot at once but stays hidden until <see cref="Land"/>.</summary>
+    public Rect? Expect(HangItem item)
+    {
+        var c = CardOf(item);
+        if (c == null) return null;
+        HoldOpen(2400);
+        c.Slide.BeginAnimation(TranslateTransform.YProperty, null);
+        c.Slide.Y = 0;
+        c.Angle = c.Velocity = c.Rot.Angle = 0;
+        c.Visibility = Visibility.Hidden;
+        return CardRect(item);
+    }
+
+    public void Land(HangItem item)
+    {
+        var c = CardOf(item);
+        if (c == null) return;
+        c.Visibility = Visibility.Visible;
+        Kick(c, 60);
+        HoldOpen(1600);
+    }
+
     // ───────────── cards ─────────────
 
     private bool OnLine(HangItem item) => item.RopeId == _ropeId && !item.Pinned;
