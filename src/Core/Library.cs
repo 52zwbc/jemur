@@ -26,6 +26,8 @@ internal sealed class Library
     private readonly List<Rope> _ropes = new();
     private readonly List<CardGroup> _groups = new();
     private Timer? _saveTimer;
+    // Folder this library loaded from; a late debounced save must not follow AppPaths to somewhere else.
+    private string? _dataDir;
     private bool _backupV1;
 
     public const int MaxPinsPerRope = 3;
@@ -52,6 +54,7 @@ internal sealed class Library
 
     public void Load(int keepDiscardedDays, string defaultRopeName = "Jemuran")
     {
+        _dataDir = AppPaths.Data;
         try
         {
             if (!File.Exists(AppPaths.ItemsFile)) return;
@@ -119,20 +122,22 @@ internal sealed class Library
     public void SaveNow()
     {
         _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+        var dir = _dataDir ??= AppPaths.Data;
+        var file = Path.Combine(dir, "items.json");
         try
         {
-            Directory.CreateDirectory(AppPaths.Data);
+            Directory.CreateDirectory(dir);
             if (_backupV1)
             {
                 // Keep the pre-ropes file once, so a downgrade or a bug never costs anyone their line.
-                var bak = Path.Combine(Path.GetDirectoryName(AppPaths.ItemsFile)!, "items.v1-backup.json");
-                if (File.Exists(AppPaths.ItemsFile) && !File.Exists(bak)) File.Copy(AppPaths.ItemsFile, bak);
+                var bak = Path.Combine(dir, "items.v1-backup.json");
+                if (File.Exists(file) && !File.Exists(bak)) File.Copy(file, bak);
                 _backupV1 = false;
             }
             var shape = new FileShape { Version = 2, Ropes = _ropes.ToList(), Groups = _groups.ToList(), Items = _items.ToList(), Discarded = _discarded.ToList() };
-            var tmp = AppPaths.ItemsFile + ".tmp";
+            var tmp = file + ".tmp";
             File.WriteAllText(tmp, JsonSerializer.Serialize(shape, Json));
-            File.Move(tmp, AppPaths.ItemsFile, true);
+            File.Move(tmp, file, true);
         }
         catch (Exception ex) { Log.Error("Saving items failed", ex); }
     }
