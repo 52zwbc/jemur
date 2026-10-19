@@ -23,6 +23,7 @@ internal sealed class GroupLabel : Border
     public readonly RotateTransform Swing = new();
     public string GroupId { get; }
     public bool Folded { get; private set; }
+    public int Count { get; private set; }
     private readonly TextBlock _text, _chevron;
 
     /// <summary>Invoked from Narrator / UI Automation (fold or unfold).</summary>
@@ -62,6 +63,7 @@ internal sealed class GroupLabel : Border
     {
         _text.Text = name;
         Folded = folded;
+        Count = count;
         _chevron.Text = folded ? ChevronRight : ChevronDown;
         Ui.AutomationName(this, L.F("group.name", name, count));
     }
@@ -83,7 +85,7 @@ internal sealed class GroupLabel : Border
             Slide.Y = 0;
         };
         Slide.BeginAnimation(TranslateTransform.YProperty, drop);
-        var swing = new DoubleAnimation(14, 0, TimeSpan.FromMilliseconds(900)) { EasingFunction = new ElasticEase { Oscillations = 3, Springiness = 4, EasingMode = EasingMode.EaseOut } };
+        var swing = new DoubleAnimation(12, 0, TimeSpan.FromMilliseconds(420)) { EasingFunction = new ElasticEase { Oscillations = 2, Springiness = 3, EasingMode = EasingMode.EaseOut } };
         swing.Completed += (_, _) => { Swing.BeginAnimation(RotateTransform.AngleProperty, null); Swing.Angle = 0; };
         Swing.BeginAnimation(RotateTransform.AngleProperty, swing);
     }

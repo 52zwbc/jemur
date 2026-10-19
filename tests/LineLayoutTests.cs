@@ -52,6 +52,15 @@ public sealed class LineLayoutTests
     public void PushPast_ClearsEveryGroupItLandsIn() =>
         Assert.Equal(530, LineLayout.PushPast(250, 20, new[] { (320d, 500d), (100d, 300d) }, 10));
 
+    [Fact]
+    public void PushSpanPast_MovesAnOverlappingGroupBesideTheOther()
+    {
+        var other = new[] { (100d, 300d) };
+        Assert.Equal(310, LineLayout.PushSpanPast(290, 400, other, 10));  // mostly right of it: past its right edge
+        Assert.Equal(-10, LineLayout.PushSpanPast(50, 150, other, 10));   // mostly left of it: past its left edge
+        Assert.Equal(320, LineLayout.PushSpanPast(320, 400, other, 10)); // clear: stays
+    }
+
     private static readonly Rect[] Screens = { new(0, 0, 1920, 1040), new(1920, 0, 1280, 984) };
 
     [Fact]

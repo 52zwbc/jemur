@@ -22,6 +22,10 @@ internal sealed partial class LineWindow
 
     private readonly Dictionary<string, GroupLabel> _labels = new();
 
+    // the group just moved, grown or unfolded: it keeps its place and overlapping groups step aside
+    private string? _anchorGroup;
+    private bool _keepingApart;
+
     // a free or grouped card hovering over a group: the group and the slot it would take
     private (string GroupId, int Index)? _preview;
 
@@ -112,26 +116,28 @@ internal sealed partial class LineWindow
     /// </summary>
     private void LayoutCards(int ms = 0)
     {
-        var spots = new Dictionary<CardView, Spot>();
+        var spots = new Dictionary<CardView, (Spot Spot, int Ms)>();
         var spans = new List<(double Start, double End)>();
+        bool settle = _pressed == null && _moveGroup == null;
+        var stepped = settle ? KeepGroupsApart() : new HashSet<string>();
         foreach (var g in RopeGroups)
         {
+            int gms = stepped.Contains(g.Id) ? Math.Max(ms, JoinMs) : ms;
             var (start, end, cards) = Arrange(g);
-            foreach (var (c, s) in cards) spots[c] = s;
+            foreach (var (c, s) in cards) spots[c] = (s, gms);
             if (_labels.TryGetValue(g.Id, out var l))
             {
                 double left = Math.Round(start - l.MeasuredWidth - LabelGap);
-                EaseTo(l, Canvas.LeftProperty, left, ms);
+                EaseTo(l, Canvas.LeftProperty, left, gms);
                 Canvas.SetTop(l, Math.Round(RopeAt(left + l.MeasuredWidth / 2) - 1));
             }
             spans.Add((start - LabelWidth(g) - LabelGap, end));
         }
 
-        bool settle = _pressed == null && _moveGroup == null;
         bool pushed = false;
         foreach (var c in _cards)
         {
-            if (spots.TryGetValue(c, out var s)) { Place(c, s, ms); continue; }
+            if (spots.TryGetValue(c, out var s)) { Place(c, s.Spot, s.Ms); continue; }
             double x = FreeX(c);
             if (settle && !IsFloating(c) && LineLayout.PushPast(x, c.Width / 2, spans, LineLayout.GroupGap) is var px && px != x)
             {
@@ -150,6 +156,39 @@ internal sealed partial class LineWindow
 
         Canvas.SetLeft(_tag, TagX);
         Canvas.SetTop(_tag, Math.Round(RopeAt(TagX + 20) - 1));
+    }
+
+    /// <summary>
+    /// Groups never overlap: the anchor (just moved, grown or unfolded) keeps its place, then every other group, from
+    /// left to right, steps past whatever it overlaps (left or right by the same half rule as free cards). Returns the
+    /// groups that moved; their new positions are committed.
+    /// </summary>
+    private HashSet<string> KeepGroupsApart()
+    {
+        var moved = new HashSet<string>();
+        var anchor = _anchorGroup;
+        if (_keepingApart) return moved;
+        _anchorGroup = null;
+        var groups = RopeGroups.ToList();
+        if (groups.Count < 2) return moved;
+        var placed = new List<(double Start, double End)>();
+        foreach (var g in groups.OrderBy(g => g.Id == anchor ? 0 : 1).ThenBy(g => Arrange(g).Start).ToList())
+        {
+            var (start, end, _) = Arrange(g);
+            double label = LabelWidth(g) + LabelGap;
+            double to = LineLayout.PushSpanPast(start - label, end, placed, LineLayout.GroupGap) + label;
+            if (Math.Abs(to - start) >= 0.5)
+            {
+                g.Position = to / LineWidth; // in memory now, so this layout already uses it; committed below
+                (start, end, _) = Arrange(g);
+                moved.Add(g.Id);
+            }
+            placed.Add((start - label, end));
+        }
+        _keepingApart = true; // each commit raises Changed, which lays out again: nothing is left to keep apart by then
+        try { foreach (var id in moved) _app.Library.MoveGroup(id, GroupById(id)!.Position); }
+        finally { _keepingApart = false; }
+        return moved;
     }
 
     private void Place(CardView c, Spot s, int ms)
@@ -203,7 +242,11 @@ internal sealed partial class LineWindow
         var fresh = new List<GroupLabel>();
         foreach (var g in groups)
         {
-            if (_labels.TryGetValue(g.Id, out var l)) folding |= l.Folded != g.Folded;
+            if (_labels.TryGetValue(g.Id, out var l))
+            {
+                folding |= l.Folded != g.Folded;
+                if (g.ItemIds.Count > l.Count || (l.Folded && !g.Folded)) _anchorGroup = g.Id; // it grew: the others make room
+            }
             else fresh.Add(l = NewLabel(g.Id));
             l.Set(g.Name, g.ItemIds.Count, g.Folded);
         }
@@ -286,7 +329,11 @@ internal sealed partial class LineWindow
         _moveHandle = null;
         _moveDragging = false;
         if (GroupById(id) is not { } g) return;
-        if (dragged) _app.Library.MoveGroup(g.Id, Arrange(g).Start / LineWidth);
+        if (dragged)
+        {
+            _anchorGroup = g.Id; // where it was put down wins; groups it landed on step aside
+            _app.Library.MoveGroup(g.Id, Arrange(g).Start / LineWidth);
+        }
         else _app.Library.SetFolded(g.Id, !g.Folded);
     }
 

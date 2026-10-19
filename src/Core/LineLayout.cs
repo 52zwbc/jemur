@@ -39,6 +39,13 @@ internal static class LineLayout
     public static (double Dx, double Tilt) StackSlot(int index) =>
         (index * StackStep, index % 2 == 0 ? -StackTilt : StackTilt);
 
+    /// <summary>Where a group's span <paramref name="start"/>..<paramref name="end"/> starts once it is clear of the other groups' spans (same rule as <see cref="PushPast"/>).</summary>
+    public static double PushSpanPast(double start, double end, IReadOnlyList<(double Start, double End)> spans, double gap)
+    {
+        double half = (end - start) / 2;
+        return PushPast(start + half, half, spans, gap) - half;
+    }
+
     /// <summary>
     /// Where a free card centred at <paramref name="x"/> goes so it overlaps no span (a group with its label): unchanged
     /// if clear, else just past the edge of the span it hits — the right edge (where a growing group pushes it) unless

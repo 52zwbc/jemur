@@ -772,7 +772,7 @@ internal sealed class JemurApp
             var name = AskGroupName(L.T("group.rename"), g.Name);
             if (name != null) Library.RenameGroup(id, name);
         }, ""));
-        m.Items.Add(Ui.MenuItem(L.T(g.Folded ? "group.unfold" : "group.fold"), () => Library.SetFolded(id, !g.Folded), g.Folded ? "" : ""));
+        m.Items.Add(Ui.MenuItem(L.T(g.Folded ? "group.unfold" : "group.fold"), () => Library.SetFolded(id, !g.Folded)));
         m.Items.Add(Ui.MenuItem(L.T("group.ungroup"), () => Library.Ungroup(id, Line.UngroupPositions(g)), ""));
         m.Items.Add(new Separator());
         m.Items.Add(Ui.MenuItem(L.T("group.discardAll"), () =>
