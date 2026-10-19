@@ -2,6 +2,21 @@
 
 All notable changes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Lines: keep cards on more than one rope. Switch from the name tag, the Control Panel or Alt+Shift+G (next line), and move cards between lines from their menu.
+- Groups: gather cards into a named group on a line, move it by its label, and fold it into a stack. Group actions are also under Group in a card's menu, so the Control Panel reaches them with the Apps key or Shift+F10.
+- Pin to desktop: up to 3 cards per line float above other apps anywhere on screen, also from an opened card.
+- Take everything in: Alt+Shift+J or a left-click on the tray icon lifts every card and pin out of sight, and hangs them back out. The choice is kept across restarts.
+
+### Changed
+- A left-click on the tray icon now takes everything in or hangs it back out. Open Jemur from the tray menu or Alt+Shift+P.
+- Lifting, hanging out and switching lines stay quick with many cards; every motion is instant when Windows animation effects are off.
+
+### Upgrading
+- Older versions can't read lines, groups or pins; downgrading flattens them (a v1 backup is kept as items.v1-backup.json).
+
 ## [0.1.4] - 2026-10-18
 
 ### Added

@@ -48,6 +48,10 @@ Then a simple idea came to me: what if they just hung along the top of the scree
 - **Let it go.** Drop a card on empty space and it falls away. It waits in *Discarded* for a week (configurable) in case you change your mind.
 - **Mark up.** Press and hold a screenshot to draw on it with a pen, highlighter, box or arrow.
 - **Out of sight.** When you're not using it, the line tucks itself away and only the bottom edges of the cards peek out. Touch the top of the screen to bring it back.
+- **Take everything in.** <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>J</kbd> or a left-click on the tray icon lifts every card and pin out of sight. Do it again and they hang back out.
+- **More than one line.** Keep a line (*Tali*) per project or task. Click the name tag at the left end of the rope to switch, or press <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>G</kbd> for the next line. Cards move between lines from their right-click menu.
+- **Groups.** Gather related cards into a named group (*Kelompok*) on the line. Drag a card into a group to join it, drag the label to move the whole group, and click the label to fold the group into a stack.
+- **Pin to desktop.** Pin up to 3 cards per line anywhere on screen, above your other apps, from a card's menu or from an opened card. *Back on the line* hangs it up again.
 - **Feels like Windows.** Light and dark mode, your accent colour, Mica, keyboard shortcuts you can change, and a tray icon that matches your taskbar.
 
 ## Screenshots
@@ -124,10 +128,11 @@ Runs on Windows 10 (1809 or later) and Windows 11. Mica and rounded corners appe
 | Take a screenshot | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>S</kbd> |
 | New note | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>N</kbd> |
 | Hang whatever is on the clipboard (image, image file or text) | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>V</kbd> |
-| Show or hide the line | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>J</kbd> |
+| Take everything in / hang it back out | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>J</kbd> |
+| Next line | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>G</kbd> |
 | Open Jemur | <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>P</kbd> |
 
-Change any of them under **Settings → Keyboard shortcuts**. In the mark-up editor: <kbd>P</kbd> pen, <kbd>H</kbd> highlighter, <kbd>R</kbd> box, <kbd>A</kbd> arrow, <kbd>E</kbd> eraser, <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo and redo.
+Change any of them under **Settings → Keyboard shortcuts**. A left-click on the tray icon also takes everything in or hangs it back out; Jemur itself opens from the tray menu or <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>P</kbd>. In the mark-up editor: <kbd>P</kbd> pen, <kbd>H</kbd> highlighter, <kbd>R</kbd> box, <kbd>A</kbd> arrow, <kbd>E</kbd> eraser, <kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> undo and redo.
 
 ## Light on resources
 
