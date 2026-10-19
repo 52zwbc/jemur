@@ -7,6 +7,8 @@ using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using Jemur.Core;
 using Jemur.UI;
+using Jemur.Windows;
+using System.Windows.Automation.Provider;
 using Xunit;
 
 namespace Jemur.Tests;
@@ -118,5 +120,19 @@ public sealed class AccessibilityTests
         Assert.Equal(code.ToLowerInvariant(), L.Code);
         Assert.Equal(settings, L.T("nav.settings"));
         Assert.Contains(L.Available, language => language.Code == code.ToLowerInvariant());
+    });
+
+    [Fact]
+    public void LineTagIsAnInvokableNamedButton() => OnSta(() =>
+    {
+        var tag = new RopeTag { Text = "Klien A" };
+        int invoked = 0;
+        tag.Invoked += () => invoked++;
+        var peer = UIElementAutomationPeer.CreatePeerForElement(tag);
+        Assert.Equal("Line: Klien A", peer.GetName());
+        Assert.Equal(AutomationControlType.Button, peer.GetAutomationControlType());
+        Assert.Empty(peer.GetChildren() ?? new List<AutomationPeer>());
+        ((IInvokeProvider)peer.GetPattern(PatternInterface.Invoke)).Invoke();
+        Assert.Equal(1, invoked);
     });
 }

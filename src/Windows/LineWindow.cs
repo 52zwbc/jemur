@@ -76,7 +76,7 @@ internal sealed class LineWindow : Window
         _stage.Children.Add(_rope);
         _stage.Children.Add(_ropeTwist);
         _stage.Children.Add(_tag);
-        _tag.MouseLeftButtonUp += (_, e) => { _app.ShowRopeMenu(_tag); e.Handled = true; };
+        _tag.Invoked += () => _app.ShowRopeMenu(_tag);
         Content = _stage;
 
         SourceInitialized += (_, _) =>

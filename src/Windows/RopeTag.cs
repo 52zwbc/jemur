@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -17,6 +19,9 @@ internal sealed class RopeTag : Border
     public readonly ScaleTransform Flip = new();
     public readonly TranslateTransform Slide = new();
     private readonly TextBlock _text;
+
+    /// <summary>Clicked, or invoked from Narrator / UI Automation.</summary>
+    public event Action? Invoked;
 
     private static readonly Brush Linen = Theme.Freeze(new LinearGradientBrush(Color.FromRgb(0xF4, 0xEC, 0xDC), Color.FromRgb(0xE6, 0xD9, 0xC0), 90));
     private static readonly Brush Edge = Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x50, 0x6B, 0x55, 0x38)));
@@ -50,11 +55,26 @@ internal sealed class RopeTag : Border
         stack.Children.Add(new Border { Width = 1.4, Height = 6, Background = Cord, HorizontalAlignment = HorizontalAlignment.Center });
         stack.Children.Add(cloth);
         Child = stack;
+        MouseLeftButtonUp += (_, e) => { Invoked?.Invoke(); e.Handled = true; };
     }
 
     public string Text
     {
         get => _text.Text;
         set { _text.Text = value; Ui.AutomationName(this, L.F("rope.tagName", value)); }
+    }
+
+    // Border has no automation peer of its own, so the name above would never reach Narrator.
+    protected override AutomationPeer OnCreateAutomationPeer() => new Peer(this);
+
+    /// <summary>Reads as a button named "Line: …" that opens the rope menu; the inner text isn't announced again.</summary>
+    private sealed class Peer : FrameworkElementAutomationPeer, IInvokeProvider
+    {
+        public Peer(RopeTag owner) : base(owner) { }
+        protected override AutomationControlType GetAutomationControlTypeCore() => AutomationControlType.Button;
+        protected override string GetClassNameCore() => nameof(RopeTag);
+        protected override List<AutomationPeer>? GetChildrenCore() => null;
+        public override object? GetPattern(PatternInterface p) => p == PatternInterface.Invoke ? this : base.GetPattern(p);
+        public void Invoke() => ((RopeTag)Owner).Invoked?.Invoke();
     }
 }
