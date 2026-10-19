@@ -62,11 +62,13 @@ internal sealed class Library
             else
                 shape = JsonSerializer.Deserialize<FileShape>(json) ?? new();
 
+            shape.Items ??= new();
+            shape.Discarded ??= new();
             foreach (var i in shape.Items.Concat(shape.Discarded)) i.File = AppPaths.Rebase(i.File);
             _items.AddRange(shape.Items.Where(IsUsable));
             _discarded.AddRange(shape.Discarded.Where(IsUsable));
-            _ropes.AddRange(shape.Ropes);
-            _groups.AddRange(shape.Groups);
+            _ropes.AddRange(shape.Ropes ?? new());
+            _groups.AddRange(shape.Groups ?? new());
             _backupV1 = shape.Version < 2;
             PurgeDiscarded(keepDiscardedDays);
         }
@@ -83,6 +85,16 @@ internal sealed class Library
     {
         if (RopeById(Rope.DefaultId) == null) _ropes.Insert(0, new Rope { Id = Rope.DefaultId, Name = defaultRopeName });
         foreach (var i in _items.Concat(_discarded)) EnsureRope(i);
+
+        // Groups may only hold live items of their own rope, each in at most one group.
+        _groups.RemoveAll(g => RopeById(g.RopeId) == null);
+        var seen = new HashSet<string>();
+        foreach (var g in _groups)
+        {
+            g.ItemIds ??= new();
+            g.ItemIds = g.ItemIds.Where(id => _items.Any(i => i.Id == id && i.RopeId == g.RopeId) && seen.Add(id)).ToList();
+        }
+        _groups.RemoveAll(g => g.ItemIds.Count == 0);
     }
 
     private void EnsureRope(HangItem i)
@@ -153,6 +165,9 @@ internal sealed class Library
     public void Discard(HangItem item)
     {
         if (!_items.Remove(item)) return;
+        LeaveGroupQuietly(item);
+        item.Pinned = false;
+        item.Position = -1;
         item.DiscardedAt = DateTime.Now;
         _discarded.Insert(0, item);
         Removed?.Invoke(item);
@@ -164,6 +179,7 @@ internal sealed class Library
     public void Drop(HangItem item)
     {
         if (!_items.Remove(item)) return;
+        LeaveGroupQuietly(item);
         DeleteFile(item);
         Removed?.Invoke(item);
         Changed?.Invoke();
@@ -220,9 +236,120 @@ internal sealed class Library
 
     private void Relocate(HangItem item, string ropeId)
     {
+        LeaveGroupQuietly(item);
         item.RopeId = ropeId;
+        item.Pinned = false;
         item.Position = -1;
         Relocated?.Invoke(item);
+    }
+
+    // ───────────── pins ─────────────
+
+    public int PinCount(string ropeId) => _items.Count(i => i.Pinned && i.RopeId == ropeId);
+
+    /// <summary>Pins a card to the desktop. False when its rope already has <see cref="MaxPinsPerRope"/> pins.</summary>
+    public bool Pin(HangItem item, double left, double top)
+    {
+        if (!item.Pinned && PinCount(item.RopeId ?? Rope.DefaultId) >= MaxPinsPerRope) return false;
+        LeaveGroupQuietly(item);
+        item.Pinned = true;
+        item.PinLeft = left;
+        item.PinTop = top;
+        Relocated?.Invoke(item);
+        Commit();
+        return true;
+    }
+
+    /// <summary>Remembers where a pinned card was dragged. Silent: the view is already there.</summary>
+    public void MovePin(HangItem item, double left, double top)
+    {
+        item.PinLeft = left;
+        item.PinTop = top;
+        ScheduleSave();
+    }
+
+    public void Unpin(HangItem item)
+    {
+        item.Pinned = false;
+        item.Position = -1;
+        Relocated?.Invoke(item);
+        Commit();
+    }
+
+    // ───────────── groups ─────────────
+
+    public CardGroup? GroupOf(HangItem item) => _groups.FirstOrDefault(g => g.ItemIds.Contains(item.Id));
+
+    public CardGroup CreateGroup(HangItem first, string name)
+    {
+        LeaveGroupQuietly(first);
+        first.Pinned = false;
+        var g = new CardGroup { RopeId = first.RopeId ?? Rope.DefaultId, Name = name, Position = first.Position, ItemIds = { first.Id } };
+        _groups.Add(g);
+        Relocated?.Invoke(first);
+        Commit();
+        return g;
+    }
+
+    /// <summary>Moves a card into a group of its own rope at <paramref name="index"/> (clamped).</summary>
+    public void JoinGroup(HangItem item, string groupId, int index)
+    {
+        var g = _groups.FirstOrDefault(x => x.Id == groupId);
+        if (g == null || g.RopeId != item.RopeId) return;
+        if (!g.ItemIds.Remove(item.Id)) LeaveGroupQuietly(item); // already a member: just reordering
+        item.Pinned = false;
+        g.ItemIds.Insert(Math.Clamp(index, 0, g.ItemIds.Count), item.Id);
+        Relocated?.Invoke(item);
+        Commit();
+    }
+
+    public void LeaveGroup(HangItem item)
+    {
+        if (!LeaveGroupQuietly(item)) return;
+        Relocated?.Invoke(item);
+        Commit();
+    }
+
+    public void RenameGroup(string id, string name) => EditGroup(id, g => g.Name = name);
+    public void SetFolded(string id, bool folded) => EditGroup(id, g => g.Folded = folded);
+    public void MoveGroup(string id, double position) => EditGroup(id, g => g.Position = position);
+
+    /// <summary>Dissolves a group. <paramref name="positions"/> gives each card its new place on the rope (by item id).</summary>
+    public void Ungroup(string id, IReadOnlyDictionary<string, double>? positions = null)
+    {
+        var g = _groups.FirstOrDefault(x => x.Id == id);
+        if (g == null) return;
+        _groups.Remove(g);
+        foreach (var item in g.ItemIds.Select(i => _items.FirstOrDefault(x => x.Id == i)).OfType<HangItem>())
+        {
+            if (positions != null && positions.TryGetValue(item.Id, out var p)) item.Position = p;
+            Relocated?.Invoke(item);
+        }
+        Commit();
+    }
+
+    private void EditGroup(string id, Action<CardGroup> edit)
+    {
+        var g = _groups.FirstOrDefault(x => x.Id == id);
+        if (g == null) return;
+        edit(g);
+        Commit();
+    }
+
+    /// <summary>Takes a card out of its group (removing the group if that empties it), without raising events.</summary>
+    private bool LeaveGroupQuietly(HangItem item)
+    {
+        var g = GroupOf(item);
+        if (g == null) return false;
+        g.ItemIds.Remove(item.Id);
+        if (g.ItemIds.Count == 0) _groups.Remove(g);
+        return true;
+    }
+
+    private void Commit()
+    {
+        Changed?.Invoke();
+        ScheduleSave();
     }
 
     public void Restore(HangItem item)
