@@ -15,7 +15,8 @@
   "action.screenshot": "Screenshot",
   "action.newNote": "New note",
   "action.paste": "Hang clipboard",
-  "action.toggleLine": "Show or hide the line",
+  "action.lift": "Take everything in",
+  "action.unlift": "Hang it back out",
   "action.controlPanel": "Open Jemur",
   "action.restoreLast": "Restore last discarded",
   "action.quit": "Quit Jemur",
@@ -129,7 +130,7 @@
   "shortcut.screenshot": "Take a screenshot",
   "shortcut.note": "New note",
   "shortcut.paste": "Hang what's on the clipboard",
-  "shortcut.toggle": "Show or hide the line",
+  "shortcut.toggle": "Take everything in / hang it back out",
   "shortcut.rope": "Next line",
   "shortcut.panel": "Open Jemur",
 
@@ -167,6 +168,7 @@
   "time.days_one": "yesterday",
   "time.days_other": "{0} days ago",
 
+  "tray.lifted": "Jemur · taken in",
   "tray.items_one": "{0} item",
   "tray.items_other": "{0} items",
   "tray.running": "Jemur is running in the notification area. Press {0} to take a screenshot.",

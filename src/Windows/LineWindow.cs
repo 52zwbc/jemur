@@ -34,7 +34,7 @@ internal sealed class LineWindow : Window
     private readonly DispatcherTimer _hover, _hold, _shrink;
 
     private bool _expanded = true;
-    private bool _pinned;
+    private bool _lifted;
     private DateTime _holdOpenUntil = DateTime.MinValue;
     private DateTime _outsideSince = DateTime.MinValue;
     private bool _animating;
@@ -175,9 +175,10 @@ internal sealed class LineWindow : Window
         _cards.Add(c);
         _stage.Children.Add(c);
         LayoutCard(c);
-        if (!IsVisible && IsLoaded) Show();
-        if (!_expanded) c.Slide.Y = CollapsedOffset(c);
-        if (animate)
+        if (!IsVisible && IsLoaded && !_lifted) Show();
+        if (_lifted) c.Slide.Y = LiftedY;
+        else if (!_expanded) c.Slide.Y = CollapsedOffset(c);
+        if (animate && !_lifted)
         {
             c.Angle = 22;
             c.Slide.Y = -c.Height - 40;
@@ -218,21 +219,75 @@ internal sealed class LineWindow : Window
 
     public void HoldOpen(int ms)
     {
+        if (_lifted) return;
         if (!IsVisible && _cards.Count > 0) Show();
         _holdOpenUntil = DateTime.Now.AddMilliseconds(ms);
         SetExpanded(true);
     }
 
-    public void TogglePinned()
+    public bool IsLifted => _lifted;
+
+    private static double LiftedY => -(BandHeight + 40);
+
+    /// <summary>Takes everything in (cards rise out of sight, window hides) or hangs it back out.</summary>
+    public void SetLifted(bool lifted, bool animate)
     {
-        if (!AutoHide)
+        if (lifted == _lifted) return;
+        _lifted = lifted;
+        _shrink.Stop();
+        bool play = animate && Motion.Enabled && (IsVisible || !lifted); // hanging out starts from a hidden window
+        var order = _cards.OrderBy(XOf).ToList();
+        var ropes = new[] { _rope, _ropeShadow, _ropeTwist };
+
+        if (lifted)
         {
-            if (IsVisible) Hide(); else Show();
+            if (!play || order.Count == 0)
+            {
+                foreach (var c in order) { c.Slide.BeginAnimation(TranslateTransform.YProperty, null); c.Slide.Y = LiftedY; }
+                foreach (var r in ropes) { r.BeginAnimation(OpacityProperty, null); r.Opacity = 0; }
+                Hide();
+                return;
+            }
+            var dur = TimeSpan.FromMilliseconds(280);
+            for (int i = 0; i < order.Count; i++)
+            {
+                var c = order[i];
+                double from = c.Slide.Y;
+                c.Slide.Y = from; // base value holds the card in place until its staggered turn
+                var a = new DoubleAnimation(from, LiftedY, dur) { BeginTime = TimeSpan.FromMilliseconds(30 * i), EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+                if (i == order.Count - 1)
+                    a.Completed += (_, _) =>
+                    {
+                        if (!_lifted) return;
+                        foreach (var o in order) { o.Slide.BeginAnimation(TranslateTransform.YProperty, null); o.Slide.Y = LiftedY; }
+                        foreach (var r in ropes) { r.BeginAnimation(OpacityProperty, null); r.Opacity = 0; }
+                        Hide(); // nothing left running: no clocks, no timers
+                    };
+                c.Slide.BeginAnimation(TranslateTransform.YProperty, a);
+            }
+            foreach (var r in ropes) { double o = r.Opacity; r.Opacity = o; r.BeginAnimation(OpacityProperty, new DoubleAnimation(o, 0, dur)); }
             return;
         }
-        if (!IsVisible) Show();
-        _pinned = !_pinned;
-        SetExpanded(_pinned);
+
+        _expanded = true;
+        Height = BandHeight;
+        if (_cards.Count > 0 && !IsVisible) Show();
+        foreach (var r in ropes)
+        {
+            r.Opacity = 1;
+            r.BeginAnimation(OpacityProperty, play ? new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) : null);
+        }
+        for (int i = 0; i < order.Count; i++)
+        {
+            var c = order[i];
+            if (!play) { c.Slide.BeginAnimation(TranslateTransform.YProperty, null); c.Slide.Y = 0; continue; }
+            c.Angle = 22;
+            c.Slide.Y = LiftedY;
+            c.Slide.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(LiftedY, 0, TimeSpan.FromMilliseconds(420)) { BeginTime = TimeSpan.FromMilliseconds(30 * i), EasingFunction = new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut } });
+        }
+        if (play) StartPhysics();
+        HoldOpen(2400);
     }
 
     private bool Busy => _pressed != null || MenuOpen || _app.HasOverlay;
@@ -240,7 +295,8 @@ internal sealed class LineWindow : Window
     private void UpdateHover()
     {
         if (!IsVisible) return;
-        if (!AutoHide || _pinned || Busy || DateTime.Now < _holdOpenUntil) { SetExpanded(true); _outsideSince = DateTime.MinValue; return; }
+        if (_lifted) return;
+        if (!AutoHide || Busy || DateTime.Now < _holdOpenUntil) { SetExpanded(true); _outsideSince = DateTime.MinValue; return; }
         if (_cards.Count == 0) { SetExpanded(false); return; }
 
         var p = Native.CursorDip(this);
@@ -259,7 +315,7 @@ internal sealed class LineWindow : Window
 
     private void SetExpanded(bool on)
     {
-        if (on == _expanded) return;
+        if (_lifted || on == _expanded) return;
         _expanded = on;
         _shrink.Stop();
         if (on) Height = BandHeight;

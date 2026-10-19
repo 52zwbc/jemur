@@ -110,11 +110,12 @@ internal sealed class JemurApp
 
         Library.Load(Settings.KeepDiscardedDays);
         Line = new LineWindow(this) { AutoHide = Settings.AutoHide };
-        if (Library.Items.Count > 0) Line.Show();
+        if (Settings.Lifted) Line.SetLifted(true, animate: false);
+        else if (Library.Items.Count > 0) Line.Show();
         Library.Changed += () => _tray?.SetTip(TrayTip());
 
         _tray = new TrayIcon();
-        _tray.Click += () => ShowPanel();
+        _tray.Click += ToggleLift;
         _tray.RightClick += ShowTrayMenu;
         _tray.Show(Theme.IsTaskbarLight(), TrayTip());
         _updateHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(6) };
@@ -154,7 +155,23 @@ internal sealed class JemurApp
 
     public void Quit() => _wpf.Shutdown();
 
-    private string TrayTip() => Library.Items.Count == 0 ? "Jemur" : $"Jemur · {L.N("tray.items", Library.Items.Count)}";
+    private string TrayTip() => Settings.Lifted ? L.T("tray.lifted") : Library.Items.Count == 0 ? "Jemur" : $"Jemur · {L.N("tray.items", Library.Items.Count)}";
+
+    public bool Lifted => Settings.Lifted;
+
+    public void SetLifted(bool lifted)
+    {
+        if (Settings.Lifted == lifted) return;
+        Settings.Lifted = lifted;
+        SettingsStore.Save(Settings);
+        Line.SetLifted(lifted, animate: true);
+        _tray.SetTip(TrayTip());
+    }
+
+    public void ToggleLift() => SetLifted(!Lifted);
+
+    /// <summary>Anything that hangs a new card first brings the line back out if it was taken in.</summary>
+    public void EnsureVisible() { if (Lifted) SetLifted(false); }
 
     private void ListenForSecondInstance()
     {
@@ -169,7 +186,7 @@ internal sealed class JemurApp
         Actions.Screenshot => () => _ = TakeScreenshot(),
         Actions.Note => NewNote,
         Actions.Paste => HangClipboard,
-        Actions.Toggle => () => Line.TogglePinned(),
+        Actions.Toggle => ToggleLift,
         _ => () => ShowPanel(),
     };
 
@@ -268,6 +285,7 @@ internal sealed class JemurApp
     public async Task TakeScreenshot()
     {
         if (_capturing) return;
+        EnsureVisible();
         _capturing = true;
         bool panelVisible = _panel is { IsVisible: true, WindowState: not WindowState.Minimized };
         try
@@ -280,7 +298,7 @@ internal sealed class JemurApp
 
             var (shot, bounds) = ScreenCapture.MonitorUnderCursor();
             var windows = ScreenCapture.VisibleWindows(IntPtr.Zero);
-            if (lineVisible || Library.Items.Count > 0) Line.Show();
+            if ((lineVisible || Library.Items.Count > 0) && !Lifted) Line.Show();
 
             var w = new CaptureWindow(shot, bounds, windows);
             w.ShowDialog();
@@ -306,6 +324,7 @@ internal sealed class JemurApp
 
     public void NewNote()
     {
+        EnsureVisible();
         var item = new HangItem { Kind = ItemKind.Note, Color = Random.Shared.Next(NoteColors.Count) };
         Library.Add(item);
         _wpf.Dispatcher.BeginInvoke(() => Spotlight(item), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -313,6 +332,7 @@ internal sealed class JemurApp
 
     public void HangClipboard()
     {
+        EnsureVisible();
         try
         {
             if (Clipboard.ContainsImage() && Clipboard.GetImage() is { } img)
@@ -491,7 +511,7 @@ internal sealed class JemurApp
         m.Items.Add(Ui.MenuItem(L.T("action.screenshot"), () => _ = TakeScreenshot(), "", HotkeyText(Actions.Screenshot)));
         m.Items.Add(Ui.MenuItem(L.T("action.newNote"), NewNote, "", HotkeyText(Actions.Note)));
         m.Items.Add(Ui.MenuItem(L.T("action.paste"), HangClipboard, "", HotkeyText(Actions.Paste)));
-        m.Items.Add(Ui.MenuItem(L.T("action.toggleLine"), () => Line.TogglePinned(), "", HotkeyText(Actions.Toggle)));
+        m.Items.Add(Ui.MenuItem(L.T(Lifted ? "action.unlift" : "action.lift"), ToggleLift, "", HotkeyText(Actions.Toggle)));
         m.Items.Add(new Separator());
         var restore = Ui.MenuItem(L.T("action.restoreLast"), () => { if (Library.Discarded.Count > 0) Library.Restore(Library.Discarded[0]); }, "");
         restore.IsEnabled = Library.Discarded.Count > 0;
