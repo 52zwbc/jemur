@@ -93,8 +93,8 @@ public sealed class Settings
         {
             if (Hotkeys.ContainsKey(k)) continue;
             // A new default must not steal a combination the user already gave another action.
-            Hotkey.TryParse(v, out var want);
-            bool taken = Hotkeys.Values.Any(o => Hotkey.TryParse(o, out var h) && h == want);
+            var want = Combo(v);
+            bool taken = Hotkeys.Values.Any(o => Combo(o).SetEquals(want));
             Hotkeys[k] = taken ? "" : v;
         }
         CardSize = Math.Clamp(CardSize, 0, 2);
@@ -103,4 +103,11 @@ public sealed class Settings
         if (string.IsNullOrWhiteSpace(Language)) Language = "auto";
         if (string.IsNullOrWhiteSpace(ActiveRope)) ActiveRope = Rope.DefaultId;
     }
+
+    // ponytail: plain token compare instead of Hotkey.TryParse, so Models.cs stays WPF-free for the
+    // portable (Linux) test build; enough for the letter-key defaults, not for aliases like PgUp/PageUp.
+    private static HashSet<string> Combo(string? text) =>
+        (text ?? "").Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.ToLowerInvariant() switch { "control" => "ctrl", "windows" => "win", var s => s })
+            .ToHashSet();
 }
