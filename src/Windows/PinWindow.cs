@@ -33,7 +33,7 @@ internal sealed class PinWindow : Window
     // press / drag (physical pixels)
     private bool _pressed, _dragging, _holdFired;
     private Native.POINT _pressCursor, _lastCursor;
-    private Native.RECT _pressRect;
+    private Point _pressCard;
 
     // physics
     private bool _animating;
@@ -197,7 +197,7 @@ internal sealed class PinWindow : Window
     {
         Native.GetCursorPos(out _pressCursor);
         _lastCursor = _pressCursor;
-        Native.GetWindowRect(Hwnd, out _pressRect);
+        _pressCard = CardPx;
         _pressed = true;
         _dragging = _holdFired = false;
         Card.CaptureMouse();
@@ -214,7 +214,12 @@ internal sealed class PinWindow : Window
         int dx = p.X - _pressCursor.X, dy = p.Y - _pressCursor.Y;
         if (!_dragging && (Math.Abs(dx) > DragThreshold * s || Math.Abs(dy) > DragThreshold * s)) { _dragging = true; _hold.Stop(); }
         if (!_dragging) return;
-        Native.MoveTo(Hwnd, _pressRect.Left + dx, _pressRect.Top + dy);
+        // Anchor the card, not the window: the pad inside the window is DIPs, so its size in pixels changes with the monitor.
+        var card = LineLayout.DraggedCard(_pressCard, new Point(_pressCursor.X, _pressCursor.Y), new Point(p.X, p.Y));
+        var w = LineLayout.WindowForCard(card, Pad, s);
+        Native.MoveTo(Hwnd, w.X, w.Y);
+        double now = Scale; // crossing a seam: WPF has just applied WM_DPICHANGED's suggested rect; put the card back under the cursor
+        if (now != s) { w = LineLayout.WindowForCard(card, Pad, now); Native.MoveTo(Hwnd, w.X, w.Y); }
         Kick(-(p.X - _lastCursor.X) / s * 7);
         _lastCursor = p;
         e.Handled = true;

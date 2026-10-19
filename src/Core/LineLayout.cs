@@ -56,6 +56,9 @@ internal static class LineLayout
     public static Point WindowForCard(Point cardPx, Vector padDip, double scale) =>
         new(cardPx.X - padDip.X * scale, cardPx.Y - padDip.Y * scale);
 
+    /// <summary>Where a dragged card's top-left goes: it keeps its offset from the cursor, in physical pixels, on any monitor.</summary>
+    public static Point DraggedCard(Point cardAtPress, Point cursorAtPress, Point cursor) => cardAtPress + (cursor - cursorAtPress);
+
     /// <summary>The inverse of <see cref="WindowForCard"/>.</summary>
     public static Point CardInWindow(Point windowPx, Vector padDip, double scale) =>
         new(windowPx.X + padDip.X * scale, windowPx.Y + padDip.Y * scale);

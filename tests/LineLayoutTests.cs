@@ -54,4 +54,18 @@ public sealed class LineLayoutTests
         Assert.Equal(new Point(2400 - 92 * scale, 300 - 28 * scale), window);
         Assert.Equal(card, LineLayout.CardInWindow(window, pad, scale));
     }
+
+    [Fact]
+    public void DraggedCard_StaysUnderTheCursorWhenTheScaleChanges()
+    {
+        var pad = new Vector(92, 28);
+        var pressCard = new Point(1700, 300);
+        var pressCursor = new Point(1780, 320); // grabbed 80 px right, 20 px down from the card's top-left
+        var cursor = new Point(2100, 340);      // now on a 150% monitor
+        var card = LineLayout.DraggedCard(pressCard, pressCursor, cursor);
+        Assert.Equal(new Vector(80, 20), pressCursor - pressCard);
+        Assert.Equal(new Vector(80, 20), cursor - card);
+        foreach (var scale in new[] { 1.0, 1.5 })
+            Assert.Equal(card, LineLayout.CardInWindow(LineLayout.WindowForCard(card, pad, scale), pad, scale));
+    }
 }
