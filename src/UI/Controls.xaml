@@ -269,20 +269,34 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="bd" CornerRadius="{StaticResource J.ControlRadius}" Background="Transparent" Padding="0,0,12,0" MinHeight="32" Margin="0,1">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="40" />
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" SharedSizeGroup="gesture" />
-                            </Grid.ColumnDefinitions>
-                            <ContentPresenter x:Name="icon" ContentSource="Icon" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            <TextBlock x:Name="check" Text="&#xE73E;" FontFamily="{StaticResource J.Icons}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                            <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" Margin="0,0,0,1" RecognizesAccessKey="True" />
-                            <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource J.TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="24,0,0,0" />
-                        </Grid>
-                    </Border>
+                    <Grid>
+                        <Border x:Name="bd" CornerRadius="{StaticResource J.ControlRadius}" Background="Transparent" Padding="0,0,12,0" MinHeight="32" Margin="0,1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="40" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" SharedSizeGroup="gesture" />
+                                </Grid.ColumnDefinitions>
+                                <ContentPresenter x:Name="icon" ContentSource="Icon" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <TextBlock x:Name="check" Text="&#xE73E;" FontFamily="{StaticResource J.Icons}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" Margin="0,0,0,1" RecognizesAccessKey="True" />
+                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Foreground="{DynamicResource J.TextSecondary}" FontSize="12" VerticalAlignment="Center" Margin="24,0,0,0" />
+                                <TextBlock x:Name="chevron" Grid.Column="2" Text="&#xE76C;" FontFamily="{StaticResource J.Icons}" FontSize="12" Foreground="{DynamicResource J.TextSecondary}" VerticalAlignment="Center" Margin="24,0,0,0" Visibility="Collapsed" />
+                            </Grid>
+                        </Border>
+                        <!-- submenus (Move to line ▸, Lines ▸) open in a flyout of their own -->
+                        <Popup x:Name="PART_Popup" IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Right" HorizontalOffset="6" VerticalOffset="-5"
+                               AllowsTransparency="True" Focusable="False" PopupAnimation="None">
+                            <Border Background="{DynamicResource J.Flyout}" BorderBrush="{DynamicResource J.FlyoutStroke}" BorderThickness="1"
+                                    CornerRadius="{StaticResource J.OverlayRadius}" Padding="4" MinWidth="200" Grid.IsSharedSizeScope="True">
+                                <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+                            </Border>
+                        </Popup>
+                    </Grid>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="Role" Value="SubmenuHeader">
+                            <Setter TargetName="chevron" Property="Visibility" Value="Visible" />
+                        </Trigger>
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="bd" Property="Background" Value="{DynamicResource J.SubtleHover}" />
                         </Trigger>

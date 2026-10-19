@@ -24,17 +24,20 @@ namespace Jemur.Windows;
 internal sealed class LineWindow : Window
 {
     private const double BandHeight = 300, RopeY = 30, Sag = 9, Peek = 20, CollapsedHeight = 36;
-    private const double DragThreshold = 5;
+    private const double DragThreshold = 5, TagX = 14, SwitchSlide = 220;
     private const int HoldMs = 500;
 
     private readonly JemurApp _app;
     private readonly Canvas _stage = new();
     private readonly Path _rope, _ropeShadow, _ropeTwist;
     private readonly List<CardView> _cards = new();
+    private readonly RopeTag _tag = new();
     private readonly DispatcherTimer _hover, _hold, _shrink;
 
     private bool _expanded = true;
     private bool _lifted;
+    private string _ropeId;
+    private int _flipSeq;
     private DateTime _holdOpenUntil = DateTime.MinValue;
     private DateTime _outsideSince = DateTime.MinValue;
     private bool _animating;
@@ -72,6 +75,8 @@ internal sealed class LineWindow : Window
         _stage.Children.Add(_ropeShadow);
         _stage.Children.Add(_rope);
         _stage.Children.Add(_ropeTwist);
+        _stage.Children.Add(_tag);
+        _tag.MouseLeftButtonUp += (_, e) => { _app.ShowRopeMenu(_tag); e.Handled = true; };
         Content = _stage;
 
         SourceInitialized += (_, _) =>
@@ -93,10 +98,18 @@ internal sealed class LineWindow : Window
             Memory.TrimSoon(2500); // tucked away again: give back what showing the cards paged in
         };
 
-        foreach (var item in app.Library.Items) AddCard(item, animate: false);
-        app.Library.Added += item => { AddCard(item, animate: true); HoldOpen(2400); };
+        _ropeId = app.Settings.ActiveRope;
+        foreach (var item in app.Library.Items.Where(OnLine)) AddCard(item, animate: false);
+        UpdateTag();
+        app.Library.Added += item => { if (!OnLine(item)) return; AddCard(item, animate: true); HoldOpen(2400); };
         app.Library.Removed += item => { var c = CardOf(item); if (c != null) RemoveCard(c); };
         app.Library.Updated += item => CardOf(item)?.RefreshNote();
+        app.Library.Relocated += OnRelocated;
+        app.Library.Changed += () =>
+        {
+            UpdateTag();
+            if (StaysOut && !IsVisible && !_lifted && !_app.HasOverlay) HoldOpen(1600); // e.g. a second rope now exists: its tag must be reachable
+        };
 
         DrawRope();
         Loaded += (_, _) => { LayoutCards(); HoldOpen(1600); };
@@ -139,9 +152,16 @@ internal sealed class LineWindow : Window
         Canvas.SetTop(c, Math.Round(RopeAt(x) - 9));
     }
 
-    private void LayoutCards() { foreach (var c in _cards) LayoutCard(c); }
+    private void LayoutCards()
+    {
+        foreach (var c in _cards) LayoutCard(c);
+        Canvas.SetLeft(_tag, TagX);
+        Canvas.SetTop(_tag, Math.Round(RopeAt(TagX + 20) - 1));
+    }
 
     private double CollapsedOffset(CardView c) => -(RopeAt(XOf(c)) - 9 + c.Height - Peek);
+
+    private double TagCollapsedOffset => -(Canvas.GetTop(_tag) + (_tag.ActualHeight > 0 ? _tag.ActualHeight : 30) - Peek);
 
     private double FreePosition()
     {
@@ -163,7 +183,9 @@ internal sealed class LineWindow : Window
 
     // ───────────── cards ─────────────
 
-    private void AddCard(HangItem item, bool animate)
+    private bool OnLine(HangItem item) => item.RopeId == _ropeId && !item.Pinned;
+
+    private CardView AddCard(HangItem item, bool animate)
     {
         if (item.Position < 0 || item.Position > 1) item.Position = FreePosition();
         var c = new CardView(item);
@@ -186,6 +208,7 @@ internal sealed class LineWindow : Window
                 new DoubleAnimation(0, TimeSpan.FromMilliseconds(420)) { EasingFunction = new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut } });
             StartPhysics();
         }
+        return c;
     }
 
     private void RemoveCard(CardView c)
@@ -195,11 +218,132 @@ internal sealed class LineWindow : Window
         _stage.Children.Remove(c);
     }
 
+    /// <summary>Takes a card off the line at once, but lets it animate away (slide by <paramref name="dx"/> and fade) before it leaves the stage.</summary>
+    private void Leave(CardView c, int delayMs, double dx)
+    {
+        _cards.Remove(c);
+        c.IsHitTestVisible = false;
+        var dur = TimeSpan.FromMilliseconds(Motion.Enabled ? 260 : 0);
+        var begin = TimeSpan.FromMilliseconds(delayMs);
+        double left = Canvas.GetLeft(c), o = c.Opacity;
+        Canvas.SetLeft(c, left); c.Opacity = o; // base values hold the card where it is until its turn
+        var fade = new DoubleAnimation(o, 0, dur) { BeginTime = begin };
+        fade.Completed += (_, _) =>
+        {
+            c.BeginAnimation(Canvas.LeftProperty, null);
+            c.BeginAnimation(OpacityProperty, null);
+            _stage.Children.Remove(c);
+        };
+        c.BeginAnimation(Canvas.LeftProperty, dx == 0 ? null : new DoubleAnimation(left, left + dx, dur) { BeginTime = begin, EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } });
+        c.BeginAnimation(OpacityProperty, fade);
+    }
+
+    /// <summary>Removes cards that are still animating away, for when the line has to settle at once.</summary>
+    private void DropLeavers()
+    {
+        foreach (var c in _stage.Children.OfType<CardView>().Where(c => !_cards.Contains(c)).ToList()) _stage.Children.Remove(c);
+    }
+
+    private void OnRelocated(HangItem item)
+    {
+        var c = CardOf(item);
+        bool on = OnLine(item) && _app.Library.Items.Contains(item);
+        if (c != null && !on) RemoveCard(c);
+        else if (c == null && on) { AddCard(item, animate: true); HoldOpen(1600); }
+    }
+
+    /// <summary>The card shows a toast, then fades off the line (it is going to a rope that isn't showing).</summary>
+    public void SeeOff(HangItem item, string toast)
+    {
+        var c = CardOf(item);
+        if (c == null) return;
+        c.Toast(toast);
+        HoldOpen(1800);
+        Leave(c, 1100, 0);
+    }
+
     public void Rebuild()
     {
+        DropLeavers();
         foreach (var c in _cards.ToList()) RemoveCard(c);
-        foreach (var i in _app.Library.Items) AddCard(i, animate: false);
+        foreach (var i in _app.Library.Items.Where(OnLine)) AddCard(i, animate: false);
+        UpdateTag();
         HoldOpen(1800);
+    }
+
+    // ───────────── ropes ─────────────
+
+    public string RopeId => _ropeId;
+
+    /// <summary>The line stays on screen while the rope has cards, or while there are other ropes to switch to (its tag peeks).</summary>
+    public bool StaysOut => _cards.Count > 0 || _app.Library.Ropes.Count > 1;
+
+    private void UpdateTag(bool name = true)
+    {
+        if (name) _tag.Text = _app.Library.RopeById(_ropeId)?.Name ?? "";
+        _tag.Visibility = StaysOut ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Swaps the line to another rope: old cards slide off to the left, the tag turns over, the new cards come in from the right.</summary>
+    public void ShowRope(string ropeId, bool animate)
+    {
+        if (ropeId == _ropeId) return;
+        bool play = animate && Motion.Enabled && IsVisible && !_lifted;
+        _ropeId = ropeId;
+        var old = _cards.OrderBy(XOf).ToList();
+        for (int i = 0; i < old.Count; i++)
+        {
+            if (play) Leave(old[i], 25 * i, -SwitchSlide);
+            else RemoveCard(old[i]);
+        }
+        if (!play) DropLeavers();
+        foreach (var item in _app.Library.Items.Where(OnLine).ToList())
+        {
+            var c = AddCard(item, animate: false);
+            if (play) SlideIn(c);
+        }
+        UpdateTag(name: !play);
+        if (play) FlipTag();
+        else { _flipSeq++; _tag.Flip.BeginAnimation(ScaleTransform.ScaleYProperty, null); _tag.Flip.ScaleY = 1; }
+        HoldOpen(1800);
+    }
+
+    private void SlideIn(CardView c)
+    {
+        double left = Canvas.GetLeft(c);
+        var dur = TimeSpan.FromMilliseconds(260);
+        var slide = new DoubleAnimation(left + SwitchSlide, left, dur) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+        slide.Completed += (_, _) =>
+        {
+            if (!_cards.Contains(c)) return; // already leaving again: its newer animations own the values
+            c.BeginAnimation(Canvas.LeftProperty, null);
+            c.BeginAnimation(OpacityProperty, null);
+        };
+        c.BeginAnimation(Canvas.LeftProperty, slide);
+        c.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, dur));
+        Kick(c, (Random.Shared.NextDouble() < .5 ? -1 : 1) * 40);
+    }
+
+    /// <summary>ScaleY 1 → 0 → 1 over 200 ms; the name changes while the tag is edge-on.</summary>
+    private void FlipTag()
+    {
+        int seq = ++_flipSeq;
+        var half = TimeSpan.FromMilliseconds(100);
+        var down = new DoubleAnimation(0, half) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+        down.Completed += (_, _) =>
+        {
+            if (seq != _flipSeq) return; // a newer switch took over
+            UpdateTag();
+            var up = new DoubleAnimation(0, 1, half) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+            up.Completed += (_, _) =>
+            {
+                if (seq != _flipSeq) return;
+                _tag.Flip.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                _tag.Flip.ScaleY = 1;
+            };
+            _tag.Flip.BeginAnimation(ScaleTransform.ScaleYProperty, up);
+        };
+        _tag.Flip.BeginAnimation(ScaleTransform.ScaleYProperty, down);
     }
 
     public void Kick(HangItem item, double v) { var c = CardOf(item); if (c != null) Kick(c, v); }
@@ -220,7 +364,7 @@ internal sealed class LineWindow : Window
     public void HoldOpen(int ms)
     {
         if (_lifted) return;
-        if (!IsVisible && _cards.Count > 0) Show();
+        if (!IsVisible && StaysOut) Show();
         _holdOpenUntil = DateTime.Now.AddMilliseconds(ms);
         SetExpanded(true);
     }
@@ -236,8 +380,9 @@ internal sealed class LineWindow : Window
         _lifted = lifted;
         _shrink.Stop();
         bool play = animate && Motion.Enabled && (IsVisible || !lifted); // hanging out starts from a hidden window
+        DropLeavers();
         var order = _cards.OrderBy(XOf).ToList();
-        var ropes = new[] { _rope, _ropeShadow, _ropeTwist };
+        var ropes = new UIElement[] { _rope, _ropeShadow, _ropeTwist, _tag };
 
         if (lifted)
         {
@@ -271,7 +416,9 @@ internal sealed class LineWindow : Window
 
         _expanded = true;
         Height = BandHeight;
-        if (_cards.Count > 0 && !IsVisible) Show();
+        if (StaysOut && !IsVisible) Show();
+        _tag.Slide.BeginAnimation(TranslateTransform.YProperty, null);
+        _tag.Slide.Y = 0;
         foreach (var r in ropes)
         {
             r.Opacity = 1;
@@ -303,7 +450,7 @@ internal sealed class LineWindow : Window
         bool inside = p.X >= 0 && p.X <= LineWidth;
         if (!_expanded)
         {
-            bool overCard = _cards.Any(c => Math.Abs(p.X - XOf(c)) <= c.Width / 2 + 8);
+            bool overCard = _cards.Any(c => Math.Abs(p.X - XOf(c)) <= c.Width / 2 + 8) || (_tag.IsVisible && p.X <= TagX + _tag.ActualWidth + 8);
             if (inside && (p.Y <= 1.5 || (p.Y <= Peek + 2 && overCard))) SetExpanded(true);
             return;
         }
@@ -326,6 +473,7 @@ internal sealed class LineWindow : Window
             c.Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(on ? 0 : CollapsedOffset(c), dur) { EasingFunction = ease });
             if (on) Kick(c, (Random.Shared.NextDouble() - .5) * 46);
         }
+        _tag.Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(on ? 0 : TagCollapsedOffset, dur) { EasingFunction = ease });
         var fade = new DoubleAnimation(on ? 1 : 0, dur);
         _rope.BeginAnimation(OpacityProperty, fade);
         _ropeShadow.BeginAnimation(OpacityProperty, fade);

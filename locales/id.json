@@ -57,6 +57,7 @@
   "toast.copyFailed": "Gagal menyalin",
   "toast.saved": "Tersimpan",
   "toast.sent": "Terkirim",
+  "toast.movedTo": "Pindah ke {0}",
 
   "capture.drag": "Seret",
   "capture.dragText": "pilih area",
@@ -84,6 +85,19 @@
   "line.noMatchTitle": "Tidak ada yang cocok",
   "line.noMatchText": "Coba kata atau filter lain.",
   "line.search": "Cari catatan",
+
+  "rope.default": "Jemuran",
+  "rope.lines": "Tali",
+  "rope.new": "Tali baru…",
+  "rope.manage": "Atur tali…",
+  "rope.rename": "Ganti nama",
+  "rope.delete": "Hapus tali",
+  "rope.deleteConfirm": "Hapus \"{0}\"? Card-nya pindah ke \"{1}\".",
+  "rope.namePrompt": "Nama tali",
+  "rope.moveTo": "Pindah ke tali",
+  "rope.tagName": "Tali: {0}",
+  "rope.emptyTitle": "Belum ada apa-apa di {0}",
+
   "filter.all": "Semua ({0})",
   "filter.screenshots": "Screenshot ({0})",
   "filter.notes": "Catatan ({0})",

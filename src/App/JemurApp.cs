@@ -97,7 +97,7 @@ internal sealed class JemurApp
         {
             _wpf.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri("pack://application:,,,/UI/Controls.xaml") });
             Theme.Init(Settings.Theme);
-            Library.Load(Settings.KeepDiscardedDays);
+            LoadLibrary();
             Line = new LineWindow(this);
             _hotkeys = new HotkeyManager();
             _tray = new TrayIcon();
@@ -108,10 +108,10 @@ internal sealed class JemurApp
         Theme.Init(Settings.Theme);
         CardView.Scale = CardScales[Settings.CardSize];
 
-        Library.Load(Settings.KeepDiscardedDays);
+        LoadLibrary();
         Line = new LineWindow(this) { AutoHide = Settings.AutoHide };
         if (Settings.Lifted) Line.SetLifted(true, animate: false);
-        else if (Library.Items.Count > 0) Line.Show();
+        else if (Line.StaysOut) Line.Show();
         Library.Changed += () => _tray?.SetTip(TrayTip());
 
         _tray = new TrayIcon();
@@ -143,6 +143,12 @@ internal sealed class JemurApp
         Memory.Report("started");
     }
 
+    private void LoadLibrary()
+    {
+        Library.Load(Settings.KeepDiscardedDays, L.T("rope.default"));
+        if (Library.RopeById(Settings.ActiveRope) == null) Settings.ActiveRope = Rope.DefaultId; // its rope was deleted, or the file was replaced
+    }
+
     public void Stop()
     {
         if (_renderDocs == null) Library.SaveNow();
@@ -155,7 +161,7 @@ internal sealed class JemurApp
 
     public void Quit() => _wpf.Shutdown();
 
-    private string TrayTip() => Settings.Lifted ? L.T("tray.lifted") : Library.Items.Count == 0 ? "Jemur" : $"Jemur · {L.N("tray.items", Library.Items.Count)}";
+    private string TrayTip() => Settings.Lifted ? L.T("tray.lifted") : $"{RopeName(ActiveRope)} · {L.N("tray.items", Library.ItemsOn(ActiveRope).Count())}";
 
     public bool Lifted => Settings.Lifted;
 
@@ -173,6 +179,98 @@ internal sealed class JemurApp
     /// <summary>Anything that hangs a new card first brings the line back out if it was taken in.</summary>
     public void EnsureVisible() { if (Lifted) SetLifted(false); }
 
+    // ───────────── ropes ─────────────
+
+    public string ActiveRope => Settings.ActiveRope;
+
+    /// <summary>Raised after the active rope changes, so the control panel can follow.</summary>
+    public event Action? RopeSwitched;
+
+    private string RopeName(string id) => Library.RopeById(id)?.Name ?? "";
+
+    /// <summary>Menu headers treat "_" as an access key; rope names are the user's own text.</summary>
+    private static string MenuText(string s) => s.Replace("_", "__");
+
+    public void SwitchRope(string ropeId)
+    {
+        if (Library.RopeById(ropeId) == null) return;
+        if (ropeId == ActiveRope) { EnsureVisible(); Line.HoldOpen(1200); return; }
+        Settings.ActiveRope = ropeId;
+        SettingsStore.Save(Settings);
+        Line.ShowRope(ropeId, animate: true); // while lifted this swaps the cards out of sight; EnsureVisible then hangs the new ones out
+        EnsureVisible();
+        // Task 5: Pins.ShowRope(ropeId)
+        _tray?.SetTip(TrayTip());
+        RopeSwitched?.Invoke();
+    }
+
+    public void NextRope()
+    {
+        var ropes = Library.Ropes.ToList();
+        int i = ropes.FindIndex(r => r.Id == ActiveRope);
+        SwitchRope(ropes[(i + 1) % ropes.Count].Id);
+    }
+
+    public void NewRope(Window? owner = null)
+    {
+        var name = Prompt.Ask(L.T("rope.new").TrimEnd('…', '.', ' '), L.T("rope.namePrompt"), "", owner);
+        if (name != null) SwitchRope(Library.AddRope(name).Id);
+    }
+
+    public void RenameRope(string id, Window? owner = null)
+    {
+        var r = Library.RopeById(id);
+        if (r == null) return;
+        var name = Prompt.Ask(L.T("rope.rename"), L.T("rope.namePrompt"), r.Name, owner);
+        if (name != null) Library.RenameRope(id, name);
+    }
+
+    public void DeleteRope(string id, Window owner)
+    {
+        var r = Library.RopeById(id);
+        if (r == null || id == Rope.DefaultId) return;
+        if (MessageBox.Show(owner, L.F("rope.deleteConfirm", r.Name, RopeName(Rope.DefaultId)), L.T("rope.delete"), MessageBoxButton.OKCancel, MessageBoxImage.None) != MessageBoxResult.OK) return;
+        if (id == ActiveRope) SwitchRope(Rope.DefaultId); // switch first, so its cards then drop onto the default line
+        Library.DeleteRope(id);
+    }
+
+    /// <summary>Moves a card to another rope. If that rope isn't showing, the card says where it went before it leaves.</summary>
+    public void MoveToRope(HangItem item, string ropeId)
+    {
+        if (Library.RopeById(ropeId) == null || item.RopeId == ropeId) return;
+        if (ropeId != ActiveRope) Line.SeeOff(item, L.F("toast.movedTo", RopeName(ropeId)));
+        Library.MoveToRope(item, ropeId);
+    }
+
+    /// <summary>Brings a discarded item back. Onto the active rope it also hangs the line back out; onto another rope it goes quietly.</summary>
+    public void Restore(HangItem item)
+    {
+        if ((item.RopeId ?? Rope.DefaultId) == ActiveRope) EnsureVisible();
+        Library.Restore(item);
+    }
+
+    /// <summary>The ropes (active one checked), then New line… and Manage lines…. Shared by the rope tag and the tray's Lines submenu.</summary>
+    private void AddRopeEntries(ItemsControl menu)
+    {
+        foreach (var r in Library.Ropes)
+        {
+            var id = r.Id;
+            menu.Items.Add(Ui.MenuItem(MenuText(r.Name), () => SwitchRope(id), isChecked: id == ActiveRope));
+        }
+        menu.Items.Add(new Separator());
+        menu.Items.Add(Ui.MenuItem(L.T("rope.new"), () => NewRope(), ""));
+        menu.Items.Add(Ui.MenuItem(L.T("rope.manage"), () => { ShowPanel(); _panel?.ShowLine(); }, ""));
+    }
+
+    public void ShowRopeMenu(FrameworkElement target)
+    {
+        var m = new ContextMenu { PlacementTarget = target, Placement = PlacementMode.Bottom, VerticalOffset = 4 };
+        AddRopeEntries(m);
+        Line.MenuOpen = true;
+        m.Closed += (_, _) => Line.MenuOpen = false;
+        m.IsOpen = true;
+    }
+
     private void ListenForSecondInstance()
     {
         var ev = new EventWaitHandle(false, EventResetMode.AutoReset, Program.ShowPanelEvent);
@@ -187,6 +285,7 @@ internal sealed class JemurApp
         Actions.Note => NewNote,
         Actions.Paste => HangClipboard,
         Actions.Toggle => ToggleLift,
+        Actions.NextRope => NextRope,
         _ => () => ShowPanel(),
     };
 
@@ -298,7 +397,7 @@ internal sealed class JemurApp
 
             var (shot, bounds) = ScreenCapture.MonitorUnderCursor();
             var windows = ScreenCapture.VisibleWindows(IntPtr.Zero);
-            if ((lineVisible || Library.Items.Count > 0) && !Lifted) Line.Show();
+            if ((lineVisible || Line.StaysOut) && !Lifted) Line.Show();
 
             var w = new CaptureWindow(shot, bounds, windows);
             w.ShowDialog();
@@ -306,7 +405,7 @@ internal sealed class JemurApp
             {
                 var path = Images.NewShotPath();
                 Images.SavePng(result, path);
-                Library.Add(new HangItem { Kind = ItemKind.Image, File = path });
+                Hang(new HangItem { Kind = ItemKind.Image, File = path });
             }
         }
         catch (Exception ex)
@@ -322,11 +421,18 @@ internal sealed class JemurApp
         }
     }
 
+    /// <summary>New screenshots, notes and pastes always go on the active rope.</summary>
+    private void Hang(HangItem item)
+    {
+        item.RopeId = ActiveRope;
+        Library.Add(item);
+    }
+
     public void NewNote()
     {
         EnsureVisible();
         var item = new HangItem { Kind = ItemKind.Note, Color = Random.Shared.Next(NoteColors.Count) };
-        Library.Add(item);
+        Hang(item);
         _wpf.Dispatcher.BeginInvoke(() => Spotlight(item), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
@@ -339,7 +445,7 @@ internal sealed class JemurApp
             {
                 var path = Images.NewShotPath();
                 Images.SavePng(img, path);
-                Library.Add(new HangItem { Kind = ItemKind.Image, File = path });
+                Hang(new HangItem { Kind = ItemKind.Image, File = path });
                 return;
             }
             if (Clipboard.ContainsFileDropList())
@@ -351,14 +457,14 @@ internal sealed class JemurApp
                     if (f == null || !exts.Contains(Path.GetExtension(f).ToLowerInvariant())) continue;
                     var path = Images.NewShotPath();
                     Images.SavePng(Images.Load(f), path);
-                    Library.Add(new HangItem { Kind = ItemKind.Image, File = path });
+                    Hang(new HangItem { Kind = ItemKind.Image, File = path });
                     any = true;
                 }
                 if (any) return;
             }
             if (Clipboard.ContainsText() && Clipboard.GetText().Trim() is { Length: > 0 } text)
             {
-                Library.Add(new HangItem { Kind = ItemKind.Note, Text = text, Color = Random.Shared.Next(NoteColors.Count) });
+                Hang(new HangItem { Kind = ItemKind.Note, Text = text, Color = Random.Shared.Next(NoteColors.Count) });
                 return;
             }
             _tray.Notify("Jemur", L.T("tray.clipboardEmpty"));
@@ -491,6 +597,18 @@ internal sealed class JemurApp
                 m.Items.Add(choice);
             }
         }
+        var others = Library.Ropes.Where(r => r.Id != item.RopeId).ToList();
+        if (others.Count > 0)
+        {
+            m.Items.Add(new Separator());
+            var move = Ui.MenuItem(L.T("rope.moveTo"), () => { }, "");
+            foreach (var r in others)
+            {
+                var id = r.Id;
+                move.Items.Add(Ui.MenuItem(MenuText(r.Name), () => MoveToRope(item, id)));
+            }
+            m.Items.Add(move);
+        }
         m.Items.Add(new Separator());
         m.Items.Add(Ui.MenuItem(L.T("action.discard"), () => Discard(item), "", L.T("hint.dragOff"), critical: true));
 
@@ -512,8 +630,11 @@ internal sealed class JemurApp
         m.Items.Add(Ui.MenuItem(L.T("action.newNote"), NewNote, "", HotkeyText(Actions.Note)));
         m.Items.Add(Ui.MenuItem(L.T("action.paste"), HangClipboard, "", HotkeyText(Actions.Paste)));
         m.Items.Add(Ui.MenuItem(L.T(Lifted ? "action.unlift" : "action.lift"), ToggleLift, "", HotkeyText(Actions.Toggle)));
+        var lines = Ui.MenuItem(L.T("rope.lines"), () => { }, "");
+        AddRopeEntries(lines);
+        m.Items.Add(lines);
         m.Items.Add(new Separator());
-        var restore = Ui.MenuItem(L.T("action.restoreLast"), () => { if (Library.Discarded.Count > 0) Library.Restore(Library.Discarded[0]); }, "");
+        var restore = Ui.MenuItem(L.T("action.restoreLast"), () => { if (Library.Discarded.Count > 0) Restore(Library.Discarded[0]); }, "");
         restore.IsEnabled = Library.Discarded.Count > 0;
         m.Items.Add(restore);
         m.Items.Add(Ui.MenuItem(L.T("action.controlPanel"), () => ShowPanel(), "", HotkeyText(Actions.Panel)));

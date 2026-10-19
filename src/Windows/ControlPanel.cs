@@ -51,11 +51,13 @@ internal sealed class ControlPanel : Window
         Content = root;
 
         _app.Library.Changed += OnLibraryChanged;
+        _app.RopeSwitched += OnLibraryChanged;
         L.Changed += OnLanguageChanged;
         Closed += (_, _) =>
         {
             _updateRequest?.Cancel();
             _app.Library.Changed -= OnLibraryChanged;
+            _app.RopeSwitched -= OnLibraryChanged;
             L.Changed -= OnLanguageChanged;
             Memory.TrimSoon();
         };
@@ -99,6 +101,8 @@ internal sealed class ControlPanel : Window
     }
 
     public void ShowSettings() => Navigate(Page.Settings);
+
+    public void ShowLine() => Navigate(Page.Line);
 
     /// <summary>Renders each page to a PNG (used by <c>--render-docs</c> to produce README screenshots).</summary>
     internal void RenderPages(string dir, string suffix)
@@ -213,7 +217,7 @@ internal sealed class ControlPanel : Window
 
     private FrameworkElement LinePage()
     {
-        var items = _app.Library.Items;
+        var items = _app.Library.ItemsOn(_app.ActiveRope).ToList();
         var commands = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         var paste = Ui.Button(L.T("action.paste"), _app.HangClipboard, Ui.Kind.Subtle, "", HotkeyTip(Actions.Paste));
         var note = Ui.Button(L.T("action.newNote"), _app.NewNote, Ui.Kind.Standard, "", HotkeyTip(Actions.Note));
@@ -224,9 +228,11 @@ internal sealed class ControlPanel : Window
         commands.Children.Add(shot);
 
         var body = new StackPanel();
+        body.Children.Add(RopeBar());
         if (items.Count == 0)
         {
-            body.Children.Add(EmptyState(L.T("line.emptyTitle"), L.F("line.emptyText", HotkeyText(Actions.Screenshot), HotkeyText(Actions.Note)), rope: true));
+            string title = _app.Library.Ropes.Count > 1 ? L.F("rope.emptyTitle", _app.Library.RopeById(_app.ActiveRope)?.Name ?? "") : L.T("line.emptyTitle");
+            body.Children.Add(EmptyState(title, L.F("line.emptyText", HotkeyText(Actions.Screenshot), HotkeyText(Actions.Note)), rope: true));
             return Shell(L.T("nav.line"), commands, body);
         }
 
@@ -268,6 +274,25 @@ internal sealed class ControlPanel : Window
         foreach (var it in shown) wrap.Children.Add(Tile(it, discarded: false));
         body.Children.Add(wrap);
         return Shell(L.T("nav.line"), commands, body);
+    }
+
+    /// <summary>Which line the page (and the screen) shows, plus creating, renaming and deleting lines.</summary>
+    private UIElement RopeBar()
+    {
+        var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
+        var ropes = _app.Library.Ropes.Select(r => (r.Id, r.Name)).ToList();
+        var pick = Ui.DropDown(ropes, _app.ActiveRope, _app.SwitchRope, 200);
+        Ui.AutomationName(pick, $"{L.T("rope.lines")}: {_app.Library.RopeById(_app.ActiveRope)?.Name}");
+        bar.Children.Add(pick);
+        var rename = Ui.Button(L.T("rope.rename"), () => _app.RenameRope(_app.ActiveRope, this), Ui.Kind.Subtle, "");
+        var delete = Ui.Button(L.T("rope.delete"), () => _app.DeleteRope(_app.ActiveRope, this), Ui.Kind.Subtle, "");
+        delete.IsEnabled = _app.ActiveRope != Rope.DefaultId;
+        var add = Ui.Button(L.T("rope.new"), () => _app.NewRope(this), Ui.Kind.Subtle, "");
+        rename.Margin = new Thickness(8, 0, 0, 0);
+        bar.Children.Add(rename);
+        bar.Children.Add(delete);
+        bar.Children.Add(add);
+        return bar;
     }
 
     private void SearchTick(object? sender, EventArgs e)
@@ -363,7 +388,7 @@ internal sealed class ControlPanel : Window
         }
         if (discarded)
         {
-            act("", L.T("action.restore"), () => _app.Library.Restore(it));
+            act("", L.T("action.restore"), () => _app.Restore(it));
             act("", L.T("action.deleteForever"), () => _app.Library.DeleteForever(it));
         }
         else
@@ -382,6 +407,12 @@ internal sealed class ControlPanel : Window
         var t = Ui.Text(title);
         t.Margin = new Thickness(2, 9, 2, 0);
         root.Children.Add(t);
+        if (discarded && _app.Library.RopeById(it.RopeId ?? Rope.DefaultId) is { } rope)
+        {
+            var r = Ui.Text(rope.Name, Ui.Type.Caption, "J.TextSecondary"); // Discarded covers every line, so say which one it goes back to
+            r.Margin = new Thickness(2, 1, 2, 0);
+            root.Children.Add(r);
+        }
         string sub = discarded && it.DiscardedAt is { } at ? L.F("discarded.when", Ui.Ago(at)) : Ui.Ago(it.Created);
         if (it.Kind == ItemKind.Image && it.File != null && Images.Size(it.File) is var (pw, ph) && pw > 0) sub += $"  ·  {pw} × {ph}";
         var s = Ui.Text(sub, Ui.Type.Caption, "J.TextSecondary");
@@ -482,7 +513,7 @@ internal sealed class ControlPanel : Window
 
         list.Children.Add(Ui.GroupHeader(L.T("settings.shortcuts")));
         var shortcuts = new StackPanel();
-        foreach (var (action, glyph) in new[] { (Actions.Screenshot, ""), (Actions.Note, ""), (Actions.Paste, ""), (Actions.Toggle, ""), (Actions.Panel, "") })
+        foreach (var (action, glyph) in new[] { (Actions.Screenshot, ""), (Actions.Note, ""), (Actions.Paste, ""), (Actions.Toggle, ""), (Actions.NextRope, ""), (Actions.Panel, "") })
         {
             Hotkey? current = s.Hotkeys.TryGetValue(action, out var str) && Hotkey.TryParse(str, out var hk) ? hk : null;
             var rec = new HotkeyRecorder(current, h => _app.SetHotkey(action, h), recording => _app.SuspendHotkeys(recording));

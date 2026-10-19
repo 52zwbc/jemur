@@ -57,6 +57,7 @@
   "toast.copyFailed": "Couldn't copy",
   "toast.saved": "Saved",
   "toast.sent": "Sent",
+  "toast.movedTo": "Moved to {0}",
 
   "capture.drag": "Drag",
   "capture.dragText": "select an area",
@@ -84,6 +85,19 @@
   "line.noMatchTitle": "No matches",
   "line.noMatchText": "Try a different word or filter.",
   "line.search": "Search notes",
+
+  "rope.default": "Line",
+  "rope.lines": "Lines",
+  "rope.new": "New line…",
+  "rope.manage": "Manage lines…",
+  "rope.rename": "Rename",
+  "rope.delete": "Delete line",
+  "rope.deleteConfirm": "Delete \"{0}\"? Its cards move to \"{1}\".",
+  "rope.namePrompt": "Line name",
+  "rope.moveTo": "Move to line",
+  "rope.tagName": "Line: {0}",
+  "rope.emptyTitle": "Nothing on {0} yet",
+
   "filter.all": "All ({0})",
   "filter.screenshots": "Screenshots ({0})",
   "filter.notes": "Notes ({0})",
