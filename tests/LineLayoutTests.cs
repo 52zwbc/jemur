@@ -28,6 +28,30 @@ public sealed class LineLayoutTests
         Assert.False(LineLayout.IsOutsideGroup(100, W, 10, 250, 50));
     }
 
+    [Fact]
+    public void StackSlots_StepRightAndAlternateTilt()
+    {
+        Assert.Equal((0d, -3d), LineLayout.StackSlot(0));
+        Assert.Equal((4d, 3d), LineLayout.StackSlot(1));
+        Assert.Equal((8d, -3d), LineLayout.StackSlot(2));
+    }
+
+    [Fact]
+    public void PushPast_LeavesClearCardsAlone() =>
+        Assert.Equal(50, LineLayout.PushPast(50, 20, new[] { (100d, 300d) }, 10));
+
+    [Fact]
+    public void PushPast_MovesAnOverlappingCardJustPastTheRightEdge() =>
+        Assert.Equal(330, LineLayout.PushPast(280, 20, new[] { (100d, 300d) }, 10));
+
+    [Fact]
+    public void PushPast_SendsACardOnTheLeftHalfOutToTheLeft() =>
+        Assert.Equal(70, LineLayout.PushPast(110, 20, new[] { (100d, 300d) }, 10));
+
+    [Fact]
+    public void PushPast_ClearsEveryGroupItLandsIn() =>
+        Assert.Equal(530, LineLayout.PushPast(250, 20, new[] { (320d, 500d), (100d, 300d) }, 10));
+
     private static readonly Rect[] Screens = { new(0, 0, 1920, 1040), new(1920, 0, 1280, 984) };
 
     [Fact]

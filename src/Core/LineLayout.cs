@@ -5,7 +5,7 @@ namespace Jemur.Core;
 /// <summary>Pure geometry for card groups and desktop pins, kept free of windows so it can be tested.</summary>
 internal static class LineLayout
 {
-    public const double GroupGap = 10, FirstPinDrop = 200;
+    public const double GroupGap = 10, FirstPinDrop = 200, StackStep = 4, StackTilt = 3;
 
     /// <summary>Centre x of each card when laid out left to right from <paramref name="startX"/>.</summary>
     public static double[] GroupSlots(double startX, IReadOnlyList<double> widths, double gap)
@@ -24,11 +24,41 @@ internal static class LineLayout
     public static int SlotIndexAt(double startX, IReadOnlyList<double> widths, double gap, double x) =>
         GroupSlots(startX, widths, gap).Count(c => c < x);
 
+    /// <summary>Right edge of cards laid out from <paramref name="startX"/>.</summary>
+    public static double SpanEnd(double startX, IReadOnlyList<double> widths, double gap) =>
+        startX + widths.Sum() + gap * Math.Max(0, widths.Count - 1);
+
     /// <summary>True when the dragged card centre is more than half a card beyond either end of the group.</summary>
     public static bool IsOutsideGroup(double startX, IReadOnlyList<double> widths, double gap, double x, double cardWidth)
     {
-        var end = startX + widths.Sum() + gap * Math.Max(0, widths.Count - 1);
+        var end = SpanEnd(startX, widths, gap);
         return x < startX - cardWidth / 2 || x > end + cardWidth / 2;
+    }
+
+    /// <summary>Card <paramref name="index"/> of a folded stack (0 is the top card): its x offset and resting tilt, alternating ±3°.</summary>
+    public static (double Dx, double Tilt) StackSlot(int index) =>
+        (index * StackStep, index % 2 == 0 ? -StackTilt : StackTilt);
+
+    /// <summary>
+    /// Where a free card centred at <paramref name="x"/> goes so it overlaps no span (a group with its label): unchanged
+    /// if clear, else just past the edge of the span it hits — the right edge (where a growing group pushes it) unless
+    /// its centre is on the span's left half — and on in that direction past any span that lands it in.
+    /// </summary>
+    public static double PushPast(double x, double halfWidth, IReadOnlyList<(double Start, double End)> spans, double gap)
+    {
+        // ponytail: no room check; a card pushed off either end is clamped there by the caller and may still overlap.
+        int dir = 0;
+        for (int step = 0; step < spans.Count; step++)
+        {
+            int hit = -1;
+            for (int i = 0; i < spans.Count && hit < 0; i++)
+                if (x + halfWidth > spans[i].Start && x - halfWidth < spans[i].End) hit = i;
+            if (hit < 0) break;
+            var (start, end) = spans[hit];
+            if (dir == 0) dir = x < (start + end) / 2 ? -1 : 1;
+            x = dir < 0 ? start - gap - halfWidth : end + gap + halfWidth;
+        }
+        return x;
     }
 
     /// <summary>Keeps a pin reachable after a monitor change: unchanged if at least half is on one work area.</summary>

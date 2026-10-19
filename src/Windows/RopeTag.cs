@@ -23,11 +23,11 @@ internal sealed class RopeTag : Border
     /// <summary>Clicked, or invoked from Narrator / UI Automation.</summary>
     public event Action? Invoked;
 
-    private static readonly Brush Linen = Theme.Freeze(new LinearGradientBrush(Color.FromRgb(0xF4, 0xEC, 0xDC), Color.FromRgb(0xE6, 0xD9, 0xC0), 90));
-    private static readonly Brush Edge = Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x50, 0x6B, 0x55, 0x38)));
-    private static readonly Brush Stitch = Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x80, 0x9A, 0x7B, 0x55)));
-    private static readonly Brush Cord = Theme.Freeze(new SolidColorBrush(Color.FromRgb(0xE9, 0xDF, 0xCF)));
-    private static readonly Brush[] Shadow =
+    internal static readonly Brush Linen = Theme.Freeze(new LinearGradientBrush(Color.FromRgb(0xF4, 0xEC, 0xDC), Color.FromRgb(0xE6, 0xD9, 0xC0), 90));
+    internal static readonly Brush Edge = Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x50, 0x6B, 0x55, 0x38)));
+    internal static readonly Brush Stitch = Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x80, 0x9A, 0x7B, 0x55)));
+    internal static readonly Brush Cord = Theme.Freeze(new SolidColorBrush(Color.FromRgb(0xE9, 0xDF, 0xCF)));
+    internal static readonly Brush[] Shadow =
     {
         Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x0A, 0, 0, 0))),
         Theme.Freeze(new SolidColorBrush(Color.FromArgb(0x16, 0, 0, 0))),

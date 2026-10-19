@@ -135,4 +135,26 @@ public sealed class AccessibilityTests
         ((IInvokeProvider)peer.GetPattern(PatternInterface.Invoke)).Invoke();
         Assert.Equal(1, invoked);
     });
+
+    [Fact]
+    public void GroupLabelAndStackAreInvokableNamedButtons() => OnSta(() =>
+    {
+        var label = new GroupLabel("g");
+        label.Set("Klien A", 3, folded: false);
+        int folds = 0;
+        label.Invoked += () => folds++;
+        var peer = UIElementAutomationPeer.CreatePeerForElement(label);
+        Assert.Equal("Group Klien A, 3 cards", peer.GetName());
+        Assert.Equal(AutomationControlType.Button, peer.GetAutomationControlType());
+        ((IInvokeProvider)peer.GetPattern(PatternInterface.Invoke)).Invoke();
+        Assert.Equal(1, folds);
+
+        int unfolds = 0;
+        var badge = new StackBadge { Unfold = () => unfolds++ };
+        badge.Set(3, "Group Klien A, 3 cards");
+        var stack = UIElementAutomationPeer.CreatePeerForElement(badge);
+        Assert.Equal("Group Klien A, 3 cards", stack.GetName());
+        ((IInvokeProvider)stack.GetPattern(PatternInterface.Invoke)).Invoke();
+        Assert.Equal(1, unfolds);
+    });
 }

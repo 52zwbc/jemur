@@ -21,7 +21,7 @@ namespace Jemur.Windows;
 /// When idle the cards ride up until only their bottom edges peek out ("out of sight"), and the
 /// window shrinks to a thin strip so its layered surface costs almost nothing.
 /// </summary>
-internal sealed class LineWindow : Window
+internal sealed partial class LineWindow : Window
 {
     private const double BandHeight = 300, RopeY = 30, Sag = 9, Peek = 20, CollapsedHeight = 36;
     private const double DragThreshold = 5, TagX = 14, SwitchSlide = 220;
@@ -101,6 +101,7 @@ internal sealed class LineWindow : Window
         _ropeId = app.Settings.ActiveRope;
         foreach (var item in app.Library.Items.Where(OnLine)) AddCard(item, animate: false);
         UpdateTag();
+        SyncGroups(animate: false);
         app.Library.Added += item => { if (!OnLine(item)) return; AddCard(item, animate: true); HoldOpen(2400); };
         app.Library.Removed += item => { var c = CardOf(item); if (c != null) RemoveCard(c); };
         app.Library.Updated += item => CardOf(item)?.RefreshNote();
@@ -108,6 +109,7 @@ internal sealed class LineWindow : Window
         app.Library.Changed += () =>
         {
             UpdateTag();
+            SyncGroups(animate: true);
             if (StaysOut && !IsVisible && !_lifted && !_app.HasOverlay) HoldOpen(1600); // e.g. a second rope now exists: its tag must be reachable
         };
 
@@ -143,22 +145,6 @@ internal sealed class LineWindow : Window
         _rope.Data = _ropeShadow.Data = _ropeTwist.Data = g;
     }
 
-    private double XOf(CardView c) => Math.Clamp(c.Item.Position, 0, 1) * LineWidth;
-
-    private void LayoutCard(CardView c)
-    {
-        double x = XOf(c);
-        Canvas.SetLeft(c, Math.Round(x - c.Width / 2));
-        Canvas.SetTop(c, Math.Round(RopeAt(x) - 9));
-    }
-
-    private void LayoutCards()
-    {
-        foreach (var c in _cards) LayoutCard(c);
-        Canvas.SetLeft(_tag, TagX);
-        Canvas.SetTop(_tag, Math.Round(RopeAt(TagX + 20) - 1));
-    }
-
     private double CollapsedOffset(CardView c) => -(RopeAt(XOf(c)) - 9 + c.Height - Peek);
 
     private double TagCollapsedOffset => -(Canvas.GetTop(_tag) + (_tag.ActualHeight > 0 ? _tag.ActualHeight : 30) - Peek);
@@ -166,8 +152,9 @@ internal sealed class LineWindow : Window
     private double FreePosition()
     {
         double w = LineWidth, gap = 176 * CardView.Scale;
+        var spans = GroupSpans();
         for (double x = 140; x < w - 100; x += 24)
-            if (_cards.All(c => Math.Abs(XOf(c) - x) >= gap)) return x / w;
+            if (_cards.All(c => Math.Abs(XOf(c) - x) >= gap) && spans.All(s => x < s.Start - gap / 2 || x > s.End + gap / 2)) return x / w;
         return Math.Clamp((140 + _cards.Count * 41 % Math.Max(100, w - 280)) / w, 0.05, 0.95);
     }
 
@@ -300,6 +287,7 @@ internal sealed class LineWindow : Window
         foreach (var c in _cards.ToList()) RemoveCard(c);
         foreach (var i in _app.Library.Items.Where(OnLine)) AddCard(i, animate: false);
         UpdateTag();
+        SyncGroups(animate: false);
         HoldOpen(1800);
     }
 
@@ -329,12 +317,10 @@ internal sealed class LineWindow : Window
             else RemoveCard(old[i]);
         }
         if (!play) DropLeavers();
-        foreach (var item in _app.Library.Items.Where(OnLine).ToList())
-        {
-            var c = AddCard(item, animate: false);
-            if (play) SlideIn(c);
-        }
+        var added = _app.Library.Items.Where(OnLine).ToList().Select(item => AddCard(item, animate: false)).ToList();
         UpdateTag(name: !play);
+        SyncGroups(animate: false); // the new rope's labels and slots first: the slide-in starts from there
+        if (play) foreach (var c in added) SlideIn(c);
         if (play) FlipTag();
         else { _flipSeq++; _tag.Flip.BeginAnimation(ScaleTransform.ScaleYProperty, null); _tag.Flip.ScaleY = 1; }
         HoldOpen(1800);
@@ -414,7 +400,7 @@ internal sealed class LineWindow : Window
         bool play = animate && Motion.Enabled && (IsVisible || !lifted); // hanging out starts from a hidden window
         DropLeavers();
         var order = _cards.OrderBy(XOf).ToList();
-        var ropes = new UIElement[] { _rope, _ropeShadow, _ropeTwist, _tag };
+        var ropes = new UIElement[] { _rope, _ropeShadow, _ropeTwist, _tag }.Concat(_labels.Values).ToArray();
 
         if (lifted)
         {
@@ -449,8 +435,11 @@ internal sealed class LineWindow : Window
         _expanded = true;
         Height = BandHeight;
         if (StaysOut && !IsVisible) Show();
-        _tag.Slide.BeginAnimation(TranslateTransform.YProperty, null);
-        _tag.Slide.Y = 0;
+        foreach (var t in _labels.Values.Select(l => l.Slide).Append(_tag.Slide))
+        {
+            t.BeginAnimation(TranslateTransform.YProperty, null);
+            t.Y = 0;
+        }
         foreach (var r in ropes)
         {
             r.Opacity = 1;
@@ -469,7 +458,7 @@ internal sealed class LineWindow : Window
         HoldOpen(2400);
     }
 
-    private bool Busy => _pressed != null || MenuOpen || _app.HasOverlay;
+    private bool Busy => _pressed != null || _moveGroup != null || MenuOpen || _app.HasOverlay;
 
     private void UpdateHover()
     {
@@ -482,7 +471,7 @@ internal sealed class LineWindow : Window
         bool inside = p.X >= 0 && p.X <= LineWidth;
         if (!_expanded)
         {
-            bool overCard = _cards.Any(c => Math.Abs(p.X - XOf(c)) <= c.Width / 2 + 8) || (_tag.IsVisible && p.X <= TagX + _tag.ActualWidth + 8);
+            bool overCard = _cards.Any(c => Math.Abs(p.X - XOf(c)) <= c.Width / 2 + 8) || (_tag.IsVisible && p.X <= TagX + _tag.ActualWidth + 8) || OverLabel(p);
             if (inside && (p.Y <= 1.5 || (p.Y <= Peek + 2 && overCard))) SetExpanded(true);
             return;
         }
@@ -506,6 +495,8 @@ internal sealed class LineWindow : Window
             if (on) Kick(c, (Random.Shared.NextDouble() - .5) * 46);
         }
         _tag.Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(on ? 0 : TagCollapsedOffset, dur) { EasingFunction = ease });
+        foreach (var l in _labels.Values)
+            l.Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(on ? 0 : LabelCollapsedOffset(l), dur) { EasingFunction = ease });
         var fade = new DoubleAnimation(on ? 1 : 0, dur);
         _rope.BeginAnimation(OpacityProperty, fade);
         _ropeShadow.BeginAnimation(OpacityProperty, fade);
@@ -543,12 +534,18 @@ internal sealed class LineWindow : Window
     private void Card_Down(object sender, MouseButtonEventArgs e)
     {
         var c = (CardView)sender;
+        if (FoldedGroupOf(c) is { } stack)
+        {
+            GroupPress(stack, c, e.GetPosition(this)); // a folded stack moves as one and unfolds on a click
+            e.Handled = true;
+            return;
+        }
         _pressed = c;
         _pressPoint = e.GetPosition(this);
         _pressX = XOf(c);
         _lastDragX = _pressPoint.X;
         _dragging = _holdFired = false;
-        foreach (var o in _cards) Panel.SetZIndex(o, o == c ? 10 : 0);
+        foreach (var o in _cards) Panel.SetZIndex(o, o == c ? 10 : Math.Max(0, SpotOf(o).Z));
         c.CaptureMouse();
         _hold.Stop();
         _hold.Start();
@@ -558,6 +555,7 @@ internal sealed class LineWindow : Window
     private void Card_Move(object sender, MouseEventArgs e)
     {
         var c = (CardView)sender;
+        if (_moveHandle == c && e.LeftButton == MouseButtonState.Pressed) { GroupMove(e.GetPosition(this)); e.Handled = true; return; }
         if (_pressed != c || _holdFired || e.LeftButton != MouseButtonState.Pressed) return;
         var p = e.GetPosition(this);
         var d = p - _pressPoint;
@@ -574,19 +572,21 @@ internal sealed class LineWindow : Window
         _lastDragX = p.X;
         c.Item.Position = x / LineWidth;
         LayoutCard(c);
+        UpdatePreview(c);
         e.Handled = true;
     }
 
     private void Card_Up(object sender, MouseButtonEventArgs e)
     {
         var c = (CardView)sender;
+        if (_moveHandle == c) { GroupRelease(); e.Handled = true; return; }
         if (_pressed != c) return;
         _hold.Stop();
         c.ReleaseMouseCapture();
         _pressed = null;
         e.Handled = true;
         if (_holdFired) return;
-        if (_dragging) { _app.Library.Touch(c.Item); return; }
+        if (_dragging) { _dragging = false; DropCard(c); return; }
         _app.Spotlight(c.Item);
     }
 
@@ -610,8 +610,9 @@ internal sealed class LineWindow : Window
         c.ReleaseMouseCapture();
         _pressed = null;
         _dragging = false;
+        _preview = null;
         c.Item.Position = _pressX / LineWidth;
-        LayoutCard(c);
+        LayoutCards(JoinMs); // back to its slot (or spot); a group's gap closes again
 
         string? path = c.Item.Kind == ItemKind.Image ? c.Item.File : Images.NoteToTempFile(c.Item);
         if (path == null || !File.Exists(path)) return;

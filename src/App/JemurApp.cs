@@ -691,6 +691,7 @@ internal sealed class JemurApp
             }
             m.Items.Add(move);
         }
+        if (!item.Pinned) m.Items.Add(GroupMenuItem(item));
         m.Items.Add(new Separator());
         m.Items.Add(Ui.MenuItem(L.T("action.discard"), () => Discard(item), "", item.Pinned ? null : L.T("hint.dragOff"), critical: true));
 
@@ -712,6 +713,75 @@ internal sealed class JemurApp
             ToolTipService.SetShowOnDisabled(mi, true);
         }
         return mi;
+    }
+
+    // ───────────── groups ─────────────
+
+    /// <summary>Group ▸ New group…, the groups on this rope (its own checked), and Remove from group when it is in one.</summary>
+    private MenuItem GroupMenuItem(HangItem item)
+    {
+        var mine = Library.GroupOf(item);
+        var menu = Ui.MenuItem(L.T("group.menu"), () => { }, "");
+        menu.Items.Add(Ui.MenuItem(L.T("group.new"), () => NewGroup(item)));
+        var groups = Library.Groups.Where(g => g.RopeId == item.RopeId).ToList();
+        if (groups.Count > 0) menu.Items.Add(new Separator());
+        foreach (var g in groups)
+        {
+            var id = g.Id;
+            menu.Items.Add(Ui.MenuItem(MenuText(g.Name), () => { if (mine?.Id != id) Library.JoinGroup(item, id, int.MaxValue); }, isChecked: mine?.Id == id));
+        }
+        if (mine != null)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Ui.MenuItem(L.T("group.leave"), () => Line.LeaveGroup(item)));
+        }
+        return menu;
+    }
+
+    /// <summary>"Group 1", "Group 2", …: the first number no group on this rope uses yet.</summary>
+    private string NextGroupName(string ropeId)
+    {
+        var used = Library.Groups.Where(g => g.RopeId == ropeId).Select(g => g.Name).ToHashSet();
+        int n = 1;
+        while (used.Contains(L.F("group.defaultName", n))) n++;
+        return L.F("group.defaultName", n);
+    }
+
+    /// <summary>Asks for a group name while the line stays out (a menu holds it open).</summary>
+    private string? AskGroupName(string title, string initial)
+    {
+        Line.MenuOpen = true;
+        try { return Prompt.Ask(title, L.T("group.namePrompt"), initial, null); }
+        finally { Line.MenuOpen = false; }
+    }
+
+    public void NewGroup(HangItem item)
+    {
+        var name = AskGroupName(L.T("group.new").TrimEnd('…', '.', ' '), NextGroupName(item.RopeId ?? Rope.DefaultId));
+        if (name == null || !Library.Items.Contains(item) || item.Pinned) return;
+        Line.SettleForGroup(item);
+        Library.CreateGroup(item, name);
+    }
+
+    public void ShowGroupMenu(CardGroup g, FrameworkElement target)
+    {
+        var id = g.Id;
+        var m = new ContextMenu { PlacementTarget = target, Placement = PlacementMode.Bottom, VerticalOffset = 4 };
+        m.Items.Add(Ui.MenuItem(L.T("group.rename"), () =>
+        {
+            var name = AskGroupName(L.T("group.rename"), g.Name);
+            if (name != null) Library.RenameGroup(id, name);
+        }, ""));
+        m.Items.Add(Ui.MenuItem(L.T(g.Folded ? "group.unfold" : "group.fold"), () => Library.SetFolded(id, !g.Folded), g.Folded ? "" : ""));
+        m.Items.Add(Ui.MenuItem(L.T("group.ungroup"), () => Library.Ungroup(id, Line.UngroupPositions(g)), ""));
+        m.Items.Add(new Separator());
+        m.Items.Add(Ui.MenuItem(L.T("group.discardAll"), () =>
+        {
+            foreach (var item in g.ItemIds.ToList().Select(i => Library.Items.FirstOrDefault(x => x.Id == i)).OfType<HangItem>()) Discard(item);
+        }, "", critical: true));
+        Line.MenuOpen = true;
+        m.Closed += (_, _) => Line.MenuOpen = false;
+        m.IsOpen = true;
     }
 
     private void ShowTrayMenu()

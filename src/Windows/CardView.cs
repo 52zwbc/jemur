@@ -23,6 +23,8 @@ internal sealed class CardView : Grid
 
     public HangItem Item { get; }
     public readonly RotateTransform Rot = new();
+    /// <summary>A resting tilt under the swing, for cards in a folded group's stack.</summary>
+    public readonly RotateTransform Tilt = new();
     public readonly TranslateTransform Slide = new();
     public double Angle, Velocity;
 
@@ -38,6 +40,7 @@ internal sealed class CardView : Grid
         Item = item;
         RenderTransformOrigin = new Point(0.5, 0);
         var tg = new TransformGroup();
+        tg.Children.Add(Tilt);
         tg.Children.Add(Rot);
         tg.Children.Add(Slide);
         RenderTransform = tg;
@@ -178,6 +181,26 @@ internal sealed class CardView : Grid
 
     /// <summary>Fade the card while it is out in the spotlight.</summary>
     public void SetAway(bool away) => BeginAnimation(OpacityProperty, new DoubleAnimation(away ? 0.2 : 1, TimeSpan.FromMilliseconds(160)));
+
+    private StackBadge? _badge;
+
+    /// <summary>The count badge of a folded group's top card; <paramref name="count"/> 0 removes it.</summary>
+    public void SetBadge(int count, string name = "", Action? unfold = null)
+    {
+        if (count <= 0)
+        {
+            if (_badge != null) Children.Remove(_badge);
+            _badge = null;
+            return;
+        }
+        bool fresh = _badge == null;
+        _badge ??= new StackBadge { Margin = new Thickness(0, PinHeight - PinOverlap - 8, -8, 0) };
+        _badge.Set(count, name);
+        _badge.Unfold = unfold;
+        if (!fresh) return;
+        Children.Add(_badge);
+        _badge.Pop();
+    }
 
     public void Impulse(double degPerSec) => Velocity += degPerSec;
 
