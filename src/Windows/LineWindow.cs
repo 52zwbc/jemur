@@ -86,7 +86,9 @@ internal sealed partial class LineWindow : Window
         };
         SizeChanged += (_, _) => { DrawRope(); LayoutCards(); };
 
-        _hover = new DispatcherTimer(TimeSpan.FromMilliseconds(90), DispatcherPriority.Background, (_, _) => UpdateHover(), Dispatcher);
+        _hover = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(90) };
+        _hover.Tick += (_, _) => UpdateHover();
+        IsVisibleChanged += (_, _) => SyncHover(); // polls the cursor only while the line is out
         _hold = new DispatcherTimer(DispatcherPriority.Input, Dispatcher) { Interval = TimeSpan.FromMilliseconds(HoldMs) };
         _hold.Tick += (_, _) => OnHold();
         _shrink = new DispatcherTimer(DispatcherPriority.Background, Dispatcher) { Interval = TimeSpan.FromMilliseconds(420) };
@@ -219,7 +221,7 @@ internal sealed partial class LineWindow : Window
         if (!IsVisible && IsLoaded && !_lifted) Show();
         if (_lifted) c.Slide.Y = LiftedY;
         else if (!_expanded) c.Slide.Y = CollapsedOffset(c);
-        if (animate && !_lifted)
+        if (animate && !_lifted && Motion.Enabled)
         {
             c.Angle = 22;
             c.Slide.Y = -c.Height - 40;
@@ -241,6 +243,12 @@ internal sealed partial class LineWindow : Window
     private void Leave(CardView c, int delayMs, double dx)
     {
         _cards.Remove(c);
+        SlideOff(c, delayMs, dx);
+    }
+
+    /// <summary>A card or group label that already left the line slides by <paramref name="dx"/> and fades, then leaves the stage.</summary>
+    private void SlideOff(FrameworkElement c, int delayMs, double dx)
+    {
         c.IsHitTestVisible = false;
         var dur = TimeSpan.FromMilliseconds(Motion.Enabled ? 260 : 0);
         var begin = TimeSpan.FromMilliseconds(delayMs);
@@ -257,11 +265,20 @@ internal sealed partial class LineWindow : Window
         c.BeginAnimation(OpacityProperty, fade);
     }
 
-    /// <summary>Removes cards that are still animating away, for when the line has to settle at once.</summary>
+    /// <summary>Removes cards and labels that are still animating away, for when the line has to settle at once.</summary>
     private void DropLeavers()
     {
-        foreach (var c in _stage.Children.OfType<CardView>().Where(c => !_cards.Contains(c)).ToList()) _stage.Children.Remove(c);
+        foreach (var e in _stage.Children.OfType<FrameworkElement>().Where(e => e is CardView or GroupLabel && !Owned(e)).ToList()) _stage.Children.Remove(e);
     }
+
+    /// <summary>Still on the line (not animating away after a rope switch).</summary>
+    private bool Owned(FrameworkElement e) => e is CardView c ? _cards.Contains(c) : e is GroupLabel l && _labels.ContainsValue(l);
+
+    /// <summary>
+    /// Delay between staggered cards: <paramref name="each"/> ms, squeezed so the whole stagger stays within 300 ms
+    /// however many cards hang (a long line still settles in well under a second).
+    /// </summary>
+    private static int Stagger(int count, int each = 30) => count <= 0 ? 0 : Math.Min(each, 300 / count);
 
     private void OnRelocated(HangItem item)
     {
@@ -310,36 +327,46 @@ internal sealed partial class LineWindow : Window
         if (ropeId == _ropeId) return;
         bool play = animate && Motion.Enabled && IsVisible && !_lifted;
         _ropeId = ropeId;
-        var old = _cards.OrderBy(XOf).ToList();
-        for (int i = 0; i < old.Count; i++)
+        if (play)
         {
-            if (play) Leave(old[i], 25 * i, -SwitchSlide);
-            else RemoveCard(old[i]);
+            // cards and group labels slide off together, left to right
+            var old = _cards.Cast<FrameworkElement>().Concat(_labels.Values).OrderBy(Canvas.GetLeft).ToList();
+            int step = Stagger(old.Count, 25);
+            for (int i = 0; i < old.Count; i++)
+            {
+                if (old[i] is CardView c) Leave(c, step * i, -SwitchSlide);
+                else SlideOff(old[i], step * i, -SwitchSlide);
+            }
+            _labels.Clear();
         }
-        if (!play) DropLeavers();
+        else
+        {
+            foreach (var c in _cards.ToList()) RemoveCard(c);
+            DropLeavers();
+        }
         var added = _app.Library.Items.Where(OnLine).ToList().Select(item => AddCard(item, animate: false)).ToList();
         UpdateTag(name: !play);
         SyncGroups(animate: false); // the new rope's labels and slots first: the slide-in starts from there
-        if (play) foreach (var c in added) SlideIn(c);
+        if (play) foreach (var e in added.Cast<FrameworkElement>().Concat(_labels.Values)) SlideIn(e);
         if (play) FlipTag();
         else { _flipSeq++; _tag.Flip.BeginAnimation(ScaleTransform.ScaleYProperty, null); _tag.Flip.ScaleY = 1; }
         HoldOpen(1800);
     }
 
-    private void SlideIn(CardView c)
+    private void SlideIn(FrameworkElement c)
     {
         double left = Canvas.GetLeft(c);
         var dur = TimeSpan.FromMilliseconds(260);
         var slide = new DoubleAnimation(left + SwitchSlide, left, dur) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
         slide.Completed += (_, _) =>
         {
-            if (!_cards.Contains(c)) return; // already leaving again: its newer animations own the values
+            if (!Owned(c)) return; // already leaving again: its newer animations own the values
             c.BeginAnimation(Canvas.LeftProperty, null);
-            c.BeginAnimation(OpacityProperty, null);
+            if (c is CardView || !_lifted) c.BeginAnimation(OpacityProperty, null); // a label taken in meanwhile: the lift owns its fade
         };
         c.BeginAnimation(Canvas.LeftProperty, slide);
         c.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, dur));
-        Kick(c, (Random.Shared.NextDouble() < .5 ? -1 : 1) * 40);
+        if (c is CardView card) Kick(card, (Random.Shared.NextDouble() < .5 ? -1 : 1) * 40);
     }
 
     /// <summary>ScaleY 1 → 0 → 1 over 200 ms; the name changes while the tag is edge-on.</summary>
@@ -397,6 +424,7 @@ internal sealed partial class LineWindow : Window
         if (lifted == _lifted) return;
         _lifted = lifted;
         _shrink.Stop();
+        SyncHover();
         bool play = animate && Motion.Enabled && (IsVisible || !lifted); // hanging out starts from a hidden window
         DropLeavers();
         var order = _cards.OrderBy(XOf).ToList();
@@ -412,12 +440,13 @@ internal sealed partial class LineWindow : Window
                 return;
             }
             var dur = TimeSpan.FromMilliseconds(280);
+            int step = Stagger(order.Count);
             for (int i = 0; i < order.Count; i++)
             {
                 var c = order[i];
                 double from = c.Slide.Y;
                 c.Slide.Y = from; // base value holds the card in place until its staggered turn
-                var a = new DoubleAnimation(from, LiftedY, dur) { BeginTime = TimeSpan.FromMilliseconds(30 * i), EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+                var a = new DoubleAnimation(from, LiftedY, dur) { BeginTime = TimeSpan.FromMilliseconds(step * i), EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
                 if (i == order.Count - 1)
                     a.Completed += (_, _) =>
                     {
@@ -445,6 +474,7 @@ internal sealed partial class LineWindow : Window
             r.Opacity = 1;
             r.BeginAnimation(OpacityProperty, play ? new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260)) : null);
         }
+        int drop = Stagger(order.Count);
         for (int i = 0; i < order.Count; i++)
         {
             var c = order[i];
@@ -452,10 +482,17 @@ internal sealed partial class LineWindow : Window
             c.Angle = 22;
             c.Slide.Y = LiftedY;
             c.Slide.BeginAnimation(TranslateTransform.YProperty,
-                new DoubleAnimation(LiftedY, 0, TimeSpan.FromMilliseconds(420)) { BeginTime = TimeSpan.FromMilliseconds(30 * i), EasingFunction = new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut } });
+                new DoubleAnimation(LiftedY, 0, TimeSpan.FromMilliseconds(420)) { BeginTime = TimeSpan.FromMilliseconds(drop * i), EasingFunction = new BackEase { Amplitude = 0.3, EasingMode = EasingMode.EaseOut } });
         }
         if (play) StartPhysics();
         HoldOpen(2400);
+    }
+
+    /// <summary>The hover poll runs only while the line is on screen and not taken in (no idle timer otherwise).</summary>
+    private void SyncHover()
+    {
+        if (IsVisible && !_lifted) _hover.Start();
+        else _hover.Stop();
     }
 
     private bool Busy => _pressed != null || _moveGroup != null || MenuOpen || _app.HasOverlay;

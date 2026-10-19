@@ -167,20 +167,20 @@ internal sealed class JemurApp
 
     public bool Lifted => Settings.Lifted;
 
-    public void SetLifted(bool lifted)
+    public void SetLifted(bool lifted, bool animate = true)
     {
         if (Settings.Lifted == lifted) return;
         Settings.Lifted = lifted;
         SettingsStore.Save(Settings);
-        Line.SetLifted(lifted, animate: true);
-        Pins.SetLifted(lifted, animate: true);
-        _tray.SetTip(TrayTip());
+        Line.SetLifted(lifted, animate);
+        Pins.SetLifted(lifted, animate);
+        _tray?.SetTip(TrayTip());
     }
 
     public void ToggleLift() => SetLifted(!Lifted);
 
     /// <summary>Anything that hangs a new card first brings the line back out if it was taken in.</summary>
-    public void EnsureVisible() { if (Lifted) SetLifted(false); }
+    public void EnsureVisible(bool animate = true) { if (Lifted) SetLifted(false, animate); }
 
     // ───────────── ropes ─────────────
 
@@ -393,7 +393,7 @@ internal sealed class JemurApp
     public async Task TakeScreenshot()
     {
         if (_capturing) return;
-        EnsureVisible();
+        EnsureVisible(animate: false); // the line hides for the capture right away: no point playing the hang-out
         _capturing = true;
         bool panelVisible = _panel is { IsVisible: true, WindowState: not WindowState.Minimized };
         try
@@ -734,6 +734,8 @@ internal sealed class JemurApp
         {
             menu.Items.Add(new Separator());
             menu.Items.Add(Ui.MenuItem(L.T("group.leave"), () => Line.LeaveGroup(item)));
+            menu.Items.Add(new Separator());
+            AddGroupActions(menu, mine);
         }
         return menu;
     }
@@ -765,23 +767,32 @@ internal sealed class JemurApp
 
     public void ShowGroupMenu(CardGroup g, FrameworkElement target)
     {
-        var id = g.Id;
         var m = new ContextMenu { PlacementTarget = target, Placement = PlacementMode.Bottom, VerticalOffset = 4 };
+        AddGroupActions(m, g);
+        Line.MenuOpen = true;
+        m.Closed += (_, _) => Line.MenuOpen = false;
+        m.IsOpen = true;
+    }
+
+    /// <summary>
+    /// Rename, Fold or Unfold, Ungroup and Discard all: on the label's menu, and under Group on a member card's menu,
+    /// which the Control Panel opens from the keyboard (Apps key or Shift+F10 on a tile).
+    /// </summary>
+    private void AddGroupActions(ItemsControl m, CardGroup g)
+    {
+        var id = g.Id;
         m.Items.Add(Ui.MenuItem(L.T("group.rename"), () =>
         {
             var name = AskGroupName(L.T("group.rename"), g.Name);
             if (name != null) Library.RenameGroup(id, name);
         }, ""));
-        m.Items.Add(Ui.MenuItem(L.T(g.Folded ? "group.unfold" : "group.fold"), () => Library.SetFolded(id, !g.Folded)));
+        m.Items.Add(Ui.MenuItem(L.T(g.Folded ? "group.unfold" : "group.fold"), () => Library.SetFolded(id, !g.Folded), g.Folded ? "" : ""));
         m.Items.Add(Ui.MenuItem(L.T("group.ungroup"), () => Library.Ungroup(id, Line.UngroupPositions(g)), ""));
         m.Items.Add(new Separator());
         m.Items.Add(Ui.MenuItem(L.T("group.discardAll"), () =>
         {
             foreach (var item in g.ItemIds.ToList().Select(i => Library.Items.FirstOrDefault(x => x.Id == i)).OfType<HangItem>()) Discard(item);
         }, "", critical: true));
-        Line.MenuOpen = true;
-        m.Closed += (_, _) => Line.MenuOpen = false;
-        m.IsOpen = true;
     }
 
     private void ShowTrayMenu()
