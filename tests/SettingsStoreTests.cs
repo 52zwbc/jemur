@@ -76,6 +76,16 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Normalize_AddsRopeShortcutAndDefaultRope()
+    {
+        File.WriteAllText(AppPaths.SettingsFile, """{"Hotkeys":{"note":"Ctrl+Alt+N"},"Theme":"dark"}""");
+        var actual = SettingsStore.Load();
+        Assert.Equal("Alt+Shift+G", actual.Hotkeys["rope"]);
+        Assert.Equal("default", actual.ActiveRope);
+        Assert.False(actual.Lifted);
+    }
+
+    [Fact]
     public void NullHotkeysAreReplacedWithDefaults()
     {
         File.WriteAllText(AppPaths.SettingsFile, """{"Hotkeys":null,"CardSize":-1}""");

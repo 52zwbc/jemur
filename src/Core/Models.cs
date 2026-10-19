@@ -18,6 +18,32 @@ public sealed class HangItem
     public int Color { get; set; }
     public DateTime Created { get; set; } = DateTime.Now;
     public DateTime? DiscardedAt { get; set; }
+    /// <summary>The rope this item hangs on. Null only in files written before ropes existed; Library repairs it on load.</summary>
+    public string? RopeId { get; set; }
+    /// <summary>Pinned items sit on the desktop at PinLeft/PinTop instead of on the rope.</summary>
+    public bool Pinned { get; set; }
+    public double PinLeft { get; set; }
+    public double PinTop { get; set; }
+}
+
+/// <summary>A named line that items hang on.</summary>
+public sealed class Rope
+{
+    public const string DefaultId = "default";
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "";
+    public DateTime Created { get; set; } = DateTime.Now;
+}
+
+/// <summary>A set of cards that move together. ItemIds is the left-to-right order.</summary>
+public sealed class CardGroup
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string RopeId { get; set; } = Rope.DefaultId;
+    public string Name { get; set; } = "";
+    public double Position { get; set; } = -1;
+    public bool Folded { get; set; }
+    public List<string> ItemIds { get; set; } = new();
 }
 
 /// <summary>Named actions that can be bound to a global shortcut.</summary>
@@ -28,7 +54,8 @@ public static class Actions
     public const string Paste = "paste";
     public const string Toggle = "toggle";
     public const string Panel = "panel";
-    public static readonly string[] All = { Screenshot, Note, Paste, Toggle, Panel };
+    public const string NextRope = "rope";
+    public static readonly string[] All = { Screenshot, Note, Paste, Toggle, Panel, NextRope };
 }
 
 public sealed class Settings
@@ -45,6 +72,8 @@ public sealed class Settings
     public int KeepDiscardedDays { get; set; } = 7;
     public Dictionary<string, string> Hotkeys { get; set; } = DefaultHotkeys();
     public bool Welcomed { get; set; }
+    public string ActiveRope { get; set; } = Rope.DefaultId;
+    public bool Lifted { get; set; }
 
     public static Dictionary<string, string> DefaultHotkeys() => new()
     {
@@ -53,6 +82,7 @@ public sealed class Settings
         [Actions.Paste] = "Alt+Shift+V",
         [Actions.Toggle] = "Alt+Shift+J",
         [Actions.Panel] = "Alt+Shift+P",
+        [Actions.NextRope] = "Alt+Shift+G",
     };
 
     /// <summary>Fills in anything missing after loading a file written by an older version.</summary>
@@ -65,5 +95,6 @@ public sealed class Settings
         if (Theme is not ("system" or "light" or "dark")) Theme = "system";
         if (KeepDiscardedDays is not (1 or 7 or 30)) KeepDiscardedDays = 7;
         if (string.IsNullOrWhiteSpace(Language)) Language = "auto";
+        if (string.IsNullOrWhiteSpace(ActiveRope)) ActiveRope = Rope.DefaultId;
     }
 }
