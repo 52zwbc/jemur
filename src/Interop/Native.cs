@@ -23,6 +23,7 @@ internal static partial class Native
     public static partial bool UnregisterHotKey(IntPtr hWnd, int id);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetCursorPos(out POINT p);
+    [LibraryImport("user32.dll")] public static partial uint GetDoubleClickTime();
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] public static partial IntPtr GetWindowLongPtr(IntPtr h, int i);
     [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")] public static partial IntPtr SetWindowLongPtr(IntPtr h, int i, IntPtr v);
     [LibraryImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]

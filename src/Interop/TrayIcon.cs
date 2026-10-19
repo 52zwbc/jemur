@@ -39,13 +39,14 @@ internal sealed partial class TrayIcon : IDisposable
     private const int NIF_MESSAGE = 1, NIF_ICON = 2, NIF_TIP = 4, NIF_INFO = 0x10, NIF_SHOWTIP = 0x80;
     private const int NIIF_INFO = 1, NIIF_WARNING = 2, NIIF_ERROR = 3;
     private const int WM_TRAY = 0x8001;
-    private const int WM_LBUTTONUP = 0x0202, WM_RBUTTONUP = 0x0205, WM_CONTEXTMENU = 0x007B, NIN_SELECT = 0x0400, NIN_KEYSELECT = 0x0401;
+    private const int WM_RBUTTONUP = 0x0205, WM_CONTEXTMENU = 0x007B, NIN_SELECT = 0x0400, NIN_KEYSELECT = 0x0401;
 
     private readonly HwndSource _src;
     private readonly uint _taskbarCreated;
     private IntPtr _icon;
     private string _tip = "Jemur";
     private bool _added;
+    private long _lastClick = long.MinValue / 2;
 
     public event Action? Click;
     public event Action? RightClick;
@@ -120,7 +121,19 @@ internal sealed partial class TrayIcon : IDisposable
         if (msg == WM_TRAY)
         {
             int ev = (int)(l.ToInt64() & 0xFFFF);
-            if (ev is WM_LBUTTONUP or NIN_SELECT or NIN_KEYSELECT) Click?.Invoke();
+            // With NOTIFYICON_VERSION_4 the shell sends NIN_SELECT for a mouse click (on top of the raw
+            // WM_LBUTTONUP) and NIN_KEYSELECT for Enter/Space, and a double-click sends two NIN_SELECTs.
+            // So listen to the selection events only, and treat a repeat inside the double-click time
+            // as part of the same click, or a double-click would lift and drop again.
+            if (ev is NIN_SELECT or NIN_KEYSELECT)
+            {
+                long now = Environment.TickCount64;
+                if (now - _lastClick >= Native.GetDoubleClickTime())
+                {
+                    _lastClick = now;
+                    Click?.Invoke();
+                }
+            }
             else if (ev is WM_RBUTTONUP or WM_CONTEXTMENU) RightClick?.Invoke();
             handled = true;
         }
