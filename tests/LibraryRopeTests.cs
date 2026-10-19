@@ -81,6 +81,26 @@ public sealed class LibraryRopeTests : IDisposable
         Assert.Equal(V1, File.ReadAllText(bak));
     }
 
+    [Theory]
+    [InlineData("[" + NoteJson + "]")]
+    [InlineData("{\"Items\":[" + NoteJson + "],\"Discarded\":[]}")]
+    public void FirstV2SaveBacksUpArrayAndVersionlessFiles(string original)
+    {
+        File.WriteAllText(AppPaths.ItemsFile, original);
+        Loaded().SaveNow();
+        Assert.Equal(original, File.ReadAllText(Path.Combine(AppPaths.Data, "items.v1-backup.json")));
+    }
+
+    [Fact]
+    public void V2FileIsNotBackedUp()
+    {
+        var lib = Loaded();
+        lib.Add(Note());
+        lib.SaveNow();
+        Loaded().SaveNow();
+        Assert.False(File.Exists(Path.Combine(AppPaths.Data, "items.v1-backup.json")));
+    }
+
     [Fact]
     public void DeleteRope_MovesLiveAndDiscardedItemsToDefault()
     {

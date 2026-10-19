@@ -11,7 +11,7 @@ internal sealed class Library
 {
     private sealed class FileShape
     {
-        public int Version { get; set; } = 2;
+        public int Version { get; set; } = 1; // a file without "Version" is pre-ropes
         public List<Rope> Ropes { get; set; } = new();
         public List<CardGroup> Groups { get; set; } = new();
         public List<HangItem> Items { get; set; } = new();
@@ -117,7 +117,7 @@ internal sealed class Library
                 if (File.Exists(AppPaths.ItemsFile) && !File.Exists(bak)) File.Copy(AppPaths.ItemsFile, bak);
                 _backupV1 = false;
             }
-            var shape = new FileShape { Ropes = _ropes.ToList(), Groups = _groups.ToList(), Items = _items.ToList(), Discarded = _discarded.ToList() };
+            var shape = new FileShape { Version = 2, Ropes = _ropes.ToList(), Groups = _groups.ToList(), Items = _items.ToList(), Discarded = _discarded.ToList() };
             var tmp = AppPaths.ItemsFile + ".tmp";
             File.WriteAllText(tmp, JsonSerializer.Serialize(shape, Json));
             File.Move(tmp, AppPaths.ItemsFile, true);
