@@ -36,6 +36,21 @@ public sealed class LibraryGroupPinTests : IDisposable
     }
 
     [Fact]
+    public void Load_SurvivesNullAndDuplicateGroups()
+    {
+        File.WriteAllText(AppPaths.ItemsFile, """
+            {"Version":2,"Ropes":[{"Id":"default","Name":"Jemuran"}],
+             "Groups":[null,{"Id":null,"ItemIds":["n1"]},{"Id":"g","Name":null,"ItemIds":["n1",null]},{"Id":"g","ItemIds":["n2"]}],
+             "Items":[{"Id":"n1","Kind":"Note","Text":"a"},{"Id":"n2","Kind":"Note","Text":"b"}],"Discarded":[]}
+            """);
+        var lib = Loaded();
+        var g = Assert.Single(lib.Groups);
+        Assert.Equal("g", g.Id);
+        Assert.Equal("", g.Name);
+        Assert.Equal(new[] { "n1" }, g.ItemIds);
+    }
+
+    [Fact]
     public void Pin_RefusesFourthOnSameRope()
     {
         var lib = Loaded();

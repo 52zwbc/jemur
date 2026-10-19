@@ -109,7 +109,9 @@
   "group.unfold": "Buka lipatan",
   "group.ungroup": "Bubarkan kelompok",
   "group.discardAll": "Buang card ini",
-  "group.name": "Kelompok {0}, {1} card",
+  "group.name": "Kelompok {0}, {1}",
+  "group.cards_one": "{0} card",
+  "group.cards_other": "{0} card",
   "group.namePrompt": "Nama kelompok",
   "rope.emptyTitle": "Belum ada apa-apa di {0}",
 

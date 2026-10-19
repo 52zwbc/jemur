@@ -22,6 +22,9 @@ internal static class Prompt
 
         var box = Ui.TextBox(label, initial);
         box.Width = 320;
+        box.MaxLength = 60;
+        // The label is already shown above the box and is its accessible name; as help text too, Narrator reads it twice.
+        System.Windows.Automation.AutomationProperties.SetHelpText(box, "");
         box.Margin = new Thickness(0, 8, 0, 20);
         string? result = null;
         var save = Ui.Button(L.T("common.save"), () => { result = box.Text.Trim(); w.DialogResult = true; }, Ui.Kind.Accent);

@@ -90,7 +90,13 @@ public sealed class Settings
     {
         Hotkeys ??= new();
         foreach (var (k, v) in DefaultHotkeys())
-            if (!Hotkeys.ContainsKey(k)) Hotkeys[k] = v;
+        {
+            if (Hotkeys.ContainsKey(k)) continue;
+            // A new default must not steal a combination the user already gave another action.
+            Hotkey.TryParse(v, out var want);
+            bool taken = Hotkeys.Values.Any(o => Hotkey.TryParse(o, out var h) && h == want);
+            Hotkeys[k] = taken ? "" : v;
+        }
         CardSize = Math.Clamp(CardSize, 0, 2);
         if (Theme is not ("system" or "light" or "dark")) Theme = "system";
         if (KeepDiscardedDays is not (1 or 7 or 30)) KeepDiscardedDays = 7;

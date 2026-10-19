@@ -27,7 +27,7 @@ internal sealed class Library
     private readonly List<CardGroup> _groups = new();
     private Timer? _saveTimer;
     // Folder this library loaded from; a late debounced save must not follow AppPaths to somewhere else.
-    private string? _dataDir;
+    private string _dataDir = AppPaths.Data;
     private bool _backupV1;
 
     public const int MaxPinsPerRope = 3;
@@ -67,6 +67,8 @@ internal sealed class Library
 
             shape.Items ??= new();
             shape.Discarded ??= new();
+            shape.Items.RemoveAll(i => i == null);
+            shape.Discarded.RemoveAll(i => i == null);
             foreach (var i in shape.Items.Concat(shape.Discarded)) i.File = AppPaths.Rebase(i.File);
             _items.AddRange(shape.Items.Where(IsUsable));
             _discarded.AddRange(shape.Discarded.Where(IsUsable));
@@ -86,6 +88,15 @@ internal sealed class Library
     /// <summary>Guarantees the default rope exists and every item points at a real rope.</summary>
     private void Repair(string defaultRopeName)
     {
+        // A hand-edited or half-written file may hold nulls, missing ids or duplicates; keep the first of each.
+        var ropeIds = new HashSet<string>();
+        _ropes.RemoveAll(r => r == null || string.IsNullOrWhiteSpace(r.Id) || !ropeIds.Add(r.Id));
+        foreach (var r in _ropes)
+            if (string.IsNullOrWhiteSpace(r.Name)) r.Name = defaultRopeName;
+        var groupIds = new HashSet<string>();
+        _groups.RemoveAll(g => g == null || string.IsNullOrWhiteSpace(g.Id) || !groupIds.Add(g.Id));
+        foreach (var g in _groups) g.Name ??= "";
+
         if (RopeById(Rope.DefaultId) == null) _ropes.Insert(0, new Rope { Id = Rope.DefaultId, Name = defaultRopeName });
         foreach (var i in _items.Concat(_discarded)) EnsureRope(i);
 
@@ -122,7 +133,7 @@ internal sealed class Library
     public void SaveNow()
     {
         _saveTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-        var dir = _dataDir ??= AppPaths.Data;
+        var dir = _dataDir;
         var file = Path.Combine(dir, "items.json");
         try
         {

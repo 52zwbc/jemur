@@ -610,7 +610,9 @@ internal sealed class JemurApp
     /// </summary>
     public void PinToDesktop(HangItem item, Point? atPx = null, bool fly = true)
     {
-        if (item.Pinned || !Library.Items.Contains(item) || !CanPin(item) || Line.CardRect(item) is not { } r) return;
+        if (item.Pinned || !Library.Items.Contains(item) || !CanPin(item)) return;
+        EnsureVisible(animate: false); // a pin made while lifted would be hidden too; out at once so the flight starts from rest
+        if (Line.CardRect(item) is not { } r) return;
         double s = PrimaryScale;
         var spot = atPx
             ?? (item.PinLeft != 0 || item.PinTop != 0 ? new Point(item.PinLeft, item.PinTop) : LineLayout.FirstPinSpot(Line.CardRect(item, resting: true)!.Value.TopLeft, s));
@@ -632,6 +634,7 @@ internal sealed class JemurApp
     public void UnpinToLine(HangItem item)
     {
         if (!item.Pinned) return;
+        EnsureVisible(animate: false); // otherwise the card would land on a line that is taken in
         var pin = Pins.WindowOf(item);
         GhostWindow? ghost = null;
         if (pin is { IsVisible: true } && Motion.Enabled && !Lifted)

@@ -65,7 +65,7 @@ internal sealed class GroupLabel : Border
         Folded = folded;
         Count = count;
         _chevron.Text = folded ? ChevronRight : ChevronDown;
-        Ui.AutomationName(this, L.F("group.name", name, count));
+        Ui.AutomationName(this, L.F("group.name", name, L.N("group.cards", count)));
     }
 
     public double MeasuredWidth

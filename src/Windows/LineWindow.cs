@@ -524,12 +524,13 @@ internal sealed partial class LineWindow : Window
         _expanded = on;
         _shrink.Stop();
         if (on) Height = BandHeight;
-        var dur = TimeSpan.FromMilliseconds(on ? 260 : 320);
+        bool play = Motion.Enabled;
+        var dur = TimeSpan.FromMilliseconds(!play ? 0 : on ? 260 : 320);
         IEasingFunction ease = on ? new BackEase { Amplitude = 0.25, EasingMode = EasingMode.EaseOut } : new CubicEase { EasingMode = EasingMode.EaseInOut };
         foreach (var c in _cards)
         {
             c.Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(on ? 0 : CollapsedOffset(c), dur) { EasingFunction = ease });
-            if (on) Kick(c, (Random.Shared.NextDouble() - .5) * 46);
+            if (on && play) Kick(c, (Random.Shared.NextDouble() - .5) * 46);
         }
         _tag.Slide.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(on ? 0 : TagCollapsedOffset, dur) { EasingFunction = ease });
         foreach (var l in _labels.Values)

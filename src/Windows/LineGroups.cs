@@ -256,7 +256,7 @@ internal sealed partial class LineWindow
             if (g is { Folded: true } && Members(g).FirstOrDefault() == c)
             {
                 var id = g.Id;
-                c.SetBadge(g.ItemIds.Count, L.F("group.name", g.Name, g.ItemIds.Count), () => _app.Library.SetFolded(id, false));
+                c.SetBadge(g.ItemIds.Count, L.F("group.name", g.Name, L.N("group.cards", g.ItemIds.Count)), () => _app.Library.SetFolded(id, false));
             }
             else c.SetBadge(0);
         }
@@ -303,8 +303,12 @@ internal sealed partial class LineWindow
         _moveLastX = p.X;
         _moveDragging = false;
         _moveStart = Arrange(g).Start;
+        handle.LostMouseCapture += GroupCaptureLost;
         handle.CaptureMouse();
     }
+
+    /// <summary>Capture taken away mid-press (another window, a menu): end it like a release, but a click never folds.</summary>
+    private void GroupCaptureLost(object sender, MouseEventArgs e) => GroupRelease(click: false);
 
     /// <summary>Dragging the label (or a folded stack) moves the whole group; its cards follow and swing.</summary>
     private void GroupMove(Point p)
@@ -320,21 +324,26 @@ internal sealed partial class LineWindow
     }
 
     /// <summary>A click folds or unfolds (a stack only unfolds); a drag saves where the group went.</summary>
-    private void GroupRelease()
+    private void GroupRelease(bool click = true)
     {
-        _moveHandle?.ReleaseMouseCapture();
+        var handle = _moveHandle;
         var id = _moveGroup;
         bool dragged = _moveDragging;
         _moveGroup = null;
         _moveHandle = null;
         _moveDragging = false;
+        if (handle != null)
+        {
+            handle.LostMouseCapture -= GroupCaptureLost;
+            handle.ReleaseMouseCapture();
+        }
         if (GroupById(id) is not { } g) return;
         if (dragged)
         {
             _anchorGroup = g.Id; // where it was put down wins; groups it landed on step aside
             _app.Library.MoveGroup(g.Id, Arrange(g).Start / LineWidth);
         }
-        else _app.Library.SetFolded(g.Id, !g.Folded);
+        else if (click) _app.Library.SetFolded(g.Id, !g.Folded);
     }
 
     // ───────────── dragging a card ─────────────

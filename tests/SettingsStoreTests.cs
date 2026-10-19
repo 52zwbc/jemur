@@ -86,6 +86,23 @@ public sealed class SettingsStoreTests : IDisposable
     }
 
     [Fact]
+    public void Normalize_LeavesNewDefaultEmptyWhenItsCombinationIsTaken()
+    {
+        File.WriteAllText(AppPaths.SettingsFile, """{"Hotkeys":{"note":"shift+ALT+g"}}""");
+        var actual = SettingsStore.Load();
+        Assert.Equal("shift+ALT+g", actual.Hotkeys[Actions.Note]);
+        Assert.Equal("", actual.Hotkeys[Actions.NextRope]);
+        Assert.Equal("Alt+Shift+S", actual.Hotkeys[Actions.Screenshot]);
+    }
+
+    [Fact]
+    public void Normalize_KeepsLifted()
+    {
+        File.WriteAllText(AppPaths.SettingsFile, """{"Lifted":true}""");
+        Assert.True(SettingsStore.Load().Lifted);
+    }
+
+    [Fact]
     public void NullHotkeysAreReplacedWithDefaults()
     {
         File.WriteAllText(AppPaths.SettingsFile, """{"Hotkeys":null,"CardSize":-1}""");

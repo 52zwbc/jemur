@@ -127,6 +127,33 @@ public sealed class LibraryRopeTests : IDisposable
     }
 
     [Fact]
+    public void Restore_LandsOnTheOriginalRopeWhenItStillExists()
+    {
+        var lib = Loaded();
+        var a = lib.AddRope("A");
+        var item = Note(a.Id);
+        lib.Add(item);
+        lib.Discard(item);
+
+        lib.Restore(item);
+        Assert.Equal(a.Id, item.RopeId);
+        Assert.Contains(item, lib.ItemsOn(a.Id));
+    }
+
+    [Fact]
+    public void Load_SurvivesNullAndDuplicateRopes()
+    {
+        File.WriteAllText(AppPaths.ItemsFile, """
+            {"Version":2,"Ropes":[null,{"Id":null,"Name":"x"},{"Id":"a","Name":" "},{"Id":"a","Name":"dup"}],
+             "Items":[null,{"Id":"n1","Kind":"Note","Text":"hi","RopeId":"a"}],"Discarded":[]}
+            """);
+        var lib = Loaded();
+        Assert.Equal(new[] { "default", "a" }, lib.Ropes.Select(r => r.Id));
+        Assert.Equal("Jemuran", lib.RopeById("a")!.Name);
+        Assert.Equal("a", Assert.Single(lib.Items).RopeId);
+    }
+
+    [Fact]
     public void Restore_ReturnsToDefaultWhenRopeIsGone()
     {
         var lib = Loaded();

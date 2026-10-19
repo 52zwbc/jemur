@@ -109,7 +109,9 @@
   "group.unfold": "Unfold",
   "group.ungroup": "Ungroup",
   "group.discardAll": "Discard these cards",
-  "group.name": "Group {0}, {1} cards",
+  "group.name": "Group {0}, {1}",
+  "group.cards_one": "{0} card",
+  "group.cards_other": "{0} cards",
   "group.namePrompt": "Group name",
   "rope.emptyTitle": "Nothing on {0} yet",
 
