@@ -63,8 +63,8 @@ public sealed class Settings
     public int Version { get; set; } = 1;
     /// <summary>"system", "light" or "dark".</summary>
     public string Theme { get; set; } = "system";
-    /// <summary>"auto" or a locale code such as "en" or "id".</summary>
-    public string Language { get; set; } = "auto";
+    /// <summary>"auto" or a locale code such as "zh" or "en".</summary>
+    public string Language { get; set; } = "zh";
     public bool AutoHide { get; set; } = true;
     /// <summary>0 small, 1 medium, 2 large.</summary>
     public int CardSize { get; set; } = 1;
@@ -100,7 +100,7 @@ public sealed class Settings
         CardSize = Math.Clamp(CardSize, 0, 2);
         if (Theme is not ("system" or "light" or "dark")) Theme = "system";
         if (KeepDiscardedDays is not (1 or 7 or 30)) KeepDiscardedDays = 7;
-        if (string.IsNullOrWhiteSpace(Language)) Language = "auto";
+        if (string.IsNullOrWhiteSpace(Language)) Language = "zh";
         if (string.IsNullOrWhiteSpace(ActiveRope)) ActiveRope = Rope.DefaultId;
     }
 

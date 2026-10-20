@@ -55,7 +55,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal("dark", actual.Theme);
         Assert.False(actual.AutoHide);
         Assert.True(actual.Welcomed);
-        Assert.Equal("auto", actual.Language);
+        Assert.Equal("zh", actual.Language);
         Assert.Equal(1, actual.CardSize);
         Assert.Equal(7, actual.KeepDiscardedDays);
         Assert.Equal(Settings.DefaultHotkeys(), actual.Hotkeys);
@@ -70,7 +70,7 @@ public sealed class SettingsStoreTests : IDisposable
         Assert.Equal("", actual.Hotkeys[Actions.Paste]);
         Assert.Equal("Alt+Shift+S", actual.Hotkeys[Actions.Screenshot]);
         Assert.Equal("system", actual.Theme);
-        Assert.Equal("auto", actual.Language);
+        Assert.Equal("zh", actual.Language);
         Assert.Equal(2, actual.CardSize);
         Assert.Equal(7, actual.KeepDiscardedDays);
     }

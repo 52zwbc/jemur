@@ -114,6 +114,7 @@ public sealed class AccessibilityTests
     [InlineData("pt-BR", "Configurações")]
     [InlineData("ja", "設定")]
     [InlineData("ms", "Tetapan")]
+    [InlineData("zh", "设置")]
     public void NewLanguagesAreEmbeddedAndSelectable(string code, string settings) => OnSta(() =>
     {
         L.Use(code);
